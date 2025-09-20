@@ -1,5 +1,6 @@
 import Grid from '@mui/material/Grid2'
 import { Typography } from '@mui/material'
+
 import CustomerListTable from '@views/Dashboard/customers/list/CustomerListTable'
 
 const CustomerListTablePage = () => {

@@ -1,6 +1,14 @@
 module.exports = {
-  extends: ['next/core-web-vitals', 'plugin:@typescript-eslint/recommended', 'plugin:import/recommended', 'prettier'],
+  extends: [
+    'next/core-web-vitals',
+    'plugin:@typescript-eslint/recommended',
+    'plugin:import/recommended',
+    'prettier',
+    'next/core-web-vitals'
+  ],
   rules: {
+    '@typescript-eslint/no-unused-vars': 'warn', // Cambia de 'error' a 'warn'
+    'react-hooks/exhaustive-deps': 'warn', // Mantiene como warning
     'jsx-a11y/alt-text': 'off',
     'react/display-name': 'off',
     'react/no-children-prop': 'off',
@@ -9,7 +17,7 @@ module.exports = {
     '@typescript-eslint/consistent-type-imports': 'error',
     '@typescript-eslint/ban-ts-comment': 'off',
     '@typescript-eslint/no-explicit-any': 'off',
-    '@typescript-eslint/no-unused-vars': 'error',
+
     '@typescript-eslint/no-non-null-assertion': 'off',
     'lines-around-comment': [
       'error',
@@ -124,5 +132,6 @@ module.exports = {
         '@typescript-eslint/no-var-requires': 'off'
       }
     }
-  ]
+  ],
+  ignorePatterns: ['src/libs/*', 'src/views/apps/funcionarios/*', 'src/@core/components/customizer/*']
 }

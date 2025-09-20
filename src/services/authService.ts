@@ -16,9 +16,7 @@ class AuthService {
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
     try {
       const response = await axios.post(`${this.baseURL}/api/auth/login`, credentials, {
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        headers: { 'Content-Type': 'application/json' }
       })
 
       return response.data
@@ -29,6 +27,10 @@ class AuthService {
 
       throw new Error('Error de conexión. Inténtalo de nuevo.')
     }
+  }
+
+  async logout(): Promise<void> {
+    this.removeToken()
   }
 
   setToken(token: string) {
@@ -48,27 +50,9 @@ class AuthService {
   }
 
   isAuthenticated(): boolean {
-    return !!this.getToken()
-  }
-
-  async validateToken(): Promise<boolean> {
     const token = this.getToken()
 
-    if (!token) return false
-
-    try {
-      const response = await axios.get(`${this.baseURL}/api/auth/validate`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      })
-
-      return response.status === 200
-    } catch (error) {
-      this.removeToken()
-
-      return false
-    }
+    return !!token
   }
 }
 

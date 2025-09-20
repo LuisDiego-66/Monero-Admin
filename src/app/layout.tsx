@@ -16,6 +16,7 @@ import '@/app/globals.css'
 // Generated Icon CSS Imports
 import '@assets/iconify-icons/generated-icons.css'
 import type { Locale } from '@/configs/i18n'
+import AuthGuard from '@/components/AuthGuard'
 
 export const metadata = {
   title: 'Zarga 701',
@@ -33,8 +34,10 @@ const RootLayout = async (props: ChildrenType & { params: Promise<{ lang: Locale
   return (
     <html id='__next' lang='en' dir={direction} suppressHydrationWarning>
       <body className='flex is-full min-bs-full flex-auto flex-col'>
-        <InitColorSchemeScript attribute='data' defaultMode={systemMode} />
-        {children}
+        <AuthGuard>
+          <InitColorSchemeScript attribute='data' defaultMode={systemMode} />
+          {children}
+        </AuthGuard>
       </body>
     </html>
   )

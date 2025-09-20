@@ -113,13 +113,7 @@ const AppReactToastify = (props: Props) => {
     'bottom-center': 'bottom-center'
   }
 
-  const position = direction === 'rtl' ? positionMap[themeConfig.toastPosition] : themeConfig.toastPosition
-
-  return (
-    <ToastifyWrapper {...boxProps}>
-      <ToastContainer rtl={direction === 'rtl'} position={position} {...rest} />
-    </ToastifyWrapper>
-  )
+  return <ToastifyWrapper {...boxProps}></ToastifyWrapper>
 }
 
 export default AppReactToastify
