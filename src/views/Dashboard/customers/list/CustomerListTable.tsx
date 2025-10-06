@@ -225,7 +225,6 @@ const CustomerListTable = () => {
     getFacetedUniqueValues: getFacetedUniqueValues(),
     getFacetedMinMaxValues: getFacetedMinMaxValues(),
 
-    // Deshabilitamos la paginación del cliente ya que usamos server-side
     manualPagination: true,
     pageCount: Math.ceil(totalRecords / pageSize)
   })
@@ -238,7 +237,6 @@ const CustomerListTable = () => {
     )
   }
 
-  // Funciones para manejo de paginación
   const handlePageChange = useCallback((_: unknown, newPage: number) => {
     setPage(newPage)
     setRowSelection({}) // Limpiar selección al cambiar página
@@ -256,7 +254,6 @@ const CustomerListTable = () => {
     return selectedRows.map(row => row.original)
   }, [table]) */
 
-  // Skeleton loader para tabla
   const renderSkeleton = () => (
     <tbody>
       {Array.from({ length: pageSize }).map((_, index) => (
@@ -271,7 +268,6 @@ const CustomerListTable = () => {
     </tbody>
   )
 
-  // Componente de paginación personalizado para server-side
   const CustomTablePagination = () => (
     <div className='flex justify-between items-center flex-wrap pli-6 border-bs bs-auto plb-[12.5px] gap-2'>
       <Typography color='text.disabled'>

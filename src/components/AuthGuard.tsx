@@ -21,7 +21,7 @@ const AuthGuard = ({ children }: AuthGuardProps) => {
     const checkAuth = () => {
       const isAuth = authService.isAuthenticated()
 
-      const protectedPaths = ['/home', '/customers', '/apps', '/pages', '/forms', '/tables', '/charts']
+      const protectedPaths = ['/home', '/customers', '/apps', '/pages', '/forms', '/tables', '/charts', '/products']
       const publicPaths = ['/login', '/register', '/forgot-password']
 
       const isProtectedPath = protectedPaths.some(path => pathname.startsWith(path))

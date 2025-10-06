@@ -24,7 +24,6 @@ const TableFilters = ({
   // States
   const [tienda, setTienda] = useState<string>('TODOS')
 
-  // Función para mapear categorías a tiendas
   const getCategoryTienda = (category: string): string => {
     if (category === 'Electronics' || category === 'Office' || category === 'Games') {
       return 'HOMBRES'
@@ -49,7 +48,6 @@ const TableFilters = ({
 
       setData(filteredData ?? [])
 
-      // Reportar si hay filtros activos
       const hasActiveFilters = tienda !== 'TODOS'
 
       onFiltersChange?.(hasActiveFilters)

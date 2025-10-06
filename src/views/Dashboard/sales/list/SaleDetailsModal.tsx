@@ -21,7 +21,6 @@ import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
 import Paper from '@mui/material/Paper'
 
-// Tipos
 type SaleType = {
   id: number
   estado: 'PENDIENTE' | 'RECHAZADO' | 'PAGADO'
@@ -38,7 +37,6 @@ type SaleDetailsModalProps = {
   sale: SaleType | null
 }
 
-// Función para obtener color del estado
 const getEstadoColor = (estado: string): 'primary' | 'error' | 'success' => {
   switch (estado) {
     case 'PENDIENTE':
@@ -67,21 +65,15 @@ const SaleDetailsModal = ({ open, onClose, sale }: SaleDetailsModalProps) => {
     console.log('Aprobar venta:', sale.id)
   }
 
-  // FUNCIÓN PARA WHATSAPP
   const handleWhatsAppClick = () => {
-    // Limpiar el número de teléfono (quitar espacios, guiones, etc.)
     const phoneNumber = sale.telefono.replace(/\D/g, '')
 
-    // Crear mensaje personalizado
     const message = `Hola ${sale.cliente}, te contacto por tu pedido #${sale.id}. ¿En qué puedo ayudarte?`
 
-    // Codificar el mensaje para URL
     const encodedMessage = encodeURIComponent(message)
 
-    // Crear URL de WhatsApp (591 es el código de Bolivia)
     const whatsappUrl = `https://wa.me/591${phoneNumber}?text=${encodedMessage}`
 
-    // Abrir WhatsApp en nueva pestaña
     window.open(whatsappUrl, '_blank')
   }
 

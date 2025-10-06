@@ -52,7 +52,6 @@ declare module '@tanstack/table-core' {
   }
 }
 
-// Tipos corregidos
 type ProductType = {
   id: number
   tienda: 'HOMBRES' | 'MUJERES'
@@ -97,7 +96,6 @@ const DebouncedInput = ({
   return <CustomTextField {...props} value={value} onChange={e => setValue(e.target.value)} />
 }
 
-// Datos de ejemplo con múltiples fotos
 const productsData: ProductType[] = [
   {
     id: 1,
@@ -141,7 +139,6 @@ const productsData: ProductType[] = [
   }
 ]
 
-// Modal para cambiar descuentos - CORREGIDO
 const DiscountModal = ({
   open,
   onClose,
@@ -240,7 +237,6 @@ const DiscountModal = ({
   )
 }
 
-// Column Definitions - CORREGIDAS
 const columnHelper = createColumnHelper<ProductType>()
 
 const ProductsTable = () => {
@@ -250,12 +246,10 @@ const ProductsTable = () => {
   const [selectedProducts, setSelectedProducts] = useState<number[]>([])
   const [discountModalOpen, setDiscountModalOpen] = useState(false)
 
-  // Función para manejar selección de productos
   const handleSelectProduct = (productId: number) => {
     setSelectedProducts(prev => (prev.includes(productId) ? prev.filter(id => id !== productId) : [...prev, productId]))
   }
 
-  // Función para seleccionar todos
   const handleSelectAll = () => {
     if (selectedProducts.length === data.length) {
       setSelectedProducts([])
@@ -264,7 +258,6 @@ const ProductsTable = () => {
     }
   }
 
-  // Función para actualizar descuentos
   const handleUpdateDiscounts = (productIds: number[], newDiscount: number) => {
     setData(prev =>
       prev.map(product => (productIds.includes(product.id) ? { ...product, descuento: newDiscount } : product))

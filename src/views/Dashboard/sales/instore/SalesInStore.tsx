@@ -395,7 +395,6 @@ const PointOfSale: React.FC = () => {
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
   const [selectedCustomer, setSelectedCustomer] = useState('')
 
-  // Filtrar productos
   const filteredProducts = mockProducts.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesCategory = selectedCategory === 'TODOS' || product.category === selectedCategory
@@ -403,13 +402,11 @@ const PointOfSale: React.FC = () => {
     return matchesSearch && matchesCategory
   })
 
-  // Calcular totales
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const discount = 0
   const tax = subtotal * 0.19 // 19% IVA
   const total = subtotal - discount + tax
 
-  // Formatear moneda
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
@@ -418,7 +415,6 @@ const PointOfSale: React.FC = () => {
     }).format(amount)
   }
 
-  // Funciones del carrito
   const addToCart = (product: Product) => {
     setCart(prevCart => {
       const existingItem = prevCart.find(item => item.id === product.id)
@@ -448,7 +444,6 @@ const PointOfSale: React.FC = () => {
   }
 
   const generatePDF = () => {
-    // Crear una ventana nueva con el PDF de la factura
     const pdfWindow = window.open('', '_blank')
 
     if (pdfWindow) {

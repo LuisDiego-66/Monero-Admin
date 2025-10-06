@@ -48,7 +48,6 @@ const MaskImg = styled('img')(({ theme }) => ({
   }
 }))
 
-// Componente Logo2 mejorado para responsividad
 const Logo2 = styled('img')(({ theme }) => ({
   width: '200px',
   height: 'auto',
@@ -119,7 +118,6 @@ const LoginV2 = ({ mode }: { mode: SystemMode }) => {
     })
   }
 
-  // Formatear error para mostrar
   const getErrorMessage = () => {
     if (!loginError) return ''
 
@@ -127,7 +125,6 @@ const LoginV2 = ({ mode }: { mode: SystemMode }) => {
       return loginError.message
     }
 
-    // Si es un error de axios con response
     const axiosError = loginError as any
 
     if (axiosError?.response?.data?.message) {

@@ -1,12 +1,11 @@
 'use client'
 
-// React Imports
 import { useEffect, useMemo, useState, useCallback } from 'react'
 
-// MUI Imports
+import { useRouter } from 'next/navigation'
+
 import Card from '@mui/material/Card'
 import CardHeader from '@mui/material/CardHeader'
-
 import Chip from '@mui/material/Chip'
 import Divider from '@mui/material/Divider'
 import IconButton from '@mui/material/IconButton'
@@ -15,10 +14,15 @@ import TablePagination from '@mui/material/TablePagination'
 import Typography from '@mui/material/Typography'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
+import Skeleton from '@mui/material/Skeleton'
+import Dialog from '@mui/material/Dialog'
+import DialogTitle from '@mui/material/DialogTitle'
+import DialogContent from '@mui/material/DialogContent'
+import DialogActions from '@mui/material/DialogActions'
+import Button from '@mui/material/Button'
+import DialogContentText from '@mui/material/DialogContentText'
 import type { TextFieldProps } from '@mui/material/TextField'
-import { styled, useTheme } from '@mui/material/styles'
-
-// Third-party Imports
+import { useTheme } from '@mui/material/styles'
 import classnames from 'classnames'
 import { rankItem } from '@tanstack/match-sorter-utils'
 import {
@@ -32,24 +36,11 @@ import {
   getPaginationRowModel,
   getSortedRowModel
 } from '@tanstack/react-table'
-import type { FilterFn } from '@tanstack/react-table'
+import type { ColumnDef, FilterFn, ColumnFiltersState } from '@tanstack/react-table'
 import type { RankingInfo } from '@tanstack/match-sorter-utils'
 
-// Drag and Drop Imports
-import type { DragEndEvent } from '@dnd-kit/core'
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
-import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
-import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
-
-import type { ProductType } from '@/types/apps/ecommerceTypes'
-
-// Component Imports
-import TableFilters from './TableFilters'
 import CustomTextField from '@core/components/mui/TextField'
-import TablePaginationComponent from '@components/TablePaginationComponent'
-
-// Style Imports
+import { useProducts, useDeleteProduct } from '@/hooks/useProducts'
 import tableStyles from '@core/styles/table.module.css'
 
 declare module '@tanstack/table-core' {
@@ -61,69 +52,12 @@ declare module '@tanstack/table-core' {
   }
 }
 
-const StyledAlert = styled(Alert)(({ theme }) => ({
-  margin: theme.spacing(3),
-  '& .MuiAlert-icon': {
-    alignItems: 'center'
-  }
-}))
-
 const fuzzyFilter: FilterFn<any> = (row, columnId, value, addMeta) => {
   const itemRank = rankItem(row.getValue(columnId), value)
 
   addMeta({ itemRank })
 
   return itemRank.passed
-}
-
-// Componente para fila arrastrable
-const SortableRow = ({ row, children, isDragMode }: { row: any; children: React.ReactNode; isDragMode: boolean }) => {
-  const theme = useTheme()
-
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: row.original.id,
-    disabled: !isDragMode
-  })
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.8 : 1,
-    backgroundColor: isDragging ? theme.palette.action.selected : 'transparent',
-    zIndex: isDragging ? 1 : 0
-  }
-
-  return (
-    <tr
-      ref={setNodeRef}
-      style={style}
-      className={classnames(tableStyles.row, isDragging && 'dragging-row')}
-      {...attributes}
-    >
-      {/* Solo mostrar columna grip cuando hay filtros activos */}
-      {isDragMode && (
-        <td className={tableStyles.cell} style={{ width: '40px', padding: theme.spacing(1) }} {...listeners}>
-          <IconButton
-            size='small'
-            className='drag-handle'
-            sx={{
-              color: theme.palette.text.secondary,
-              cursor: 'grab',
-              '&:hover': {
-                color: theme.palette.primary.main
-              },
-              '&:active': {
-                cursor: 'grabbing'
-              }
-            }}
-          >
-            <i className='tabler-grip-vertical' />
-          </IconButton>
-        </td>
-      )}
-      {children}
-    </tr>
-  )
 }
 
 const DebouncedInput = ({
@@ -153,327 +87,235 @@ const DebouncedInput = ({
   return <CustomTextField {...props} value={value} onChange={e => setValue(e.target.value)} />
 }
 
-const ProductListTable = ({ productData }: { productData?: ProductType[] }) => {
-  // Hooks
+const ProductListTable = () => {
+  const router = useRouter()
   const theme = useTheme()
-
-  // States
-  const [data, setData] = useState<ProductType[]>(productData || [])
-  const [filteredData, setFilteredData] = useState<ProductType[]>(data)
   const [globalFilter, setGlobalFilter] = useState('')
-  const [hasFiltersFromComponent, setHasFiltersFromComponent] = useState(false)
-  const [isClient, setIsClient] = useState(false)
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [productToDelete, setProductToDelete] = useState<number | null>(null)
 
-  // Configurar sensores para DnD
-  const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor))
+  const deleteProduct = useDeleteProduct()
+  const { data: allProducts, isLoading, error, isFetching } = useProducts()
 
-  // Determinar si hay filtros activos
-  const hasActiveFilters = useMemo(() => {
-    return Boolean(globalFilter) || hasFiltersFromComponent
-  }, [globalFilter, hasFiltersFromComponent])
-
-  useEffect(() => {
-    setIsClient(true)
-  }, [])
-
-  const handleEdit = useCallback((productId: string) => {
-    console.log(`Editing product:`, productId)
-    window.location.href = `/products/edit/${productId}`
-  }, [])
-
-  const handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      const { active, over } = event
-
-      if (!over || active.id === over.id) return
-
-      const currentData = hasActiveFilters ? filteredData : data
-      const oldIndex = currentData.findIndex(item => item.id === active.id)
-      const newIndex = currentData.findIndex(item => item.id === over.id)
-
-      if (oldIndex === -1 || newIndex === -1) return
-
-      const newData = arrayMove(currentData, oldIndex, newIndex)
-
-      if (hasActiveFilters) {
-        setFilteredData(newData)
-      } else {
-        setData(newData)
-      }
+  const handleCellClick = useCallback(
+    (row: any) => {
+      router.push(`/products/edit/${row.original.id}`)
     },
-    [data, filteredData, hasActiveFilters]
+    [router]
   )
 
-  // Crear columnas
-  const columns = useMemo(() => {
-    const baseColumns = [
+  const handleDelete = useCallback((productId: number) => {
+    setProductToDelete(productId)
+    setDeleteDialogOpen(true)
+  }, [])
+
+  const confirmDelete = useCallback(async () => {
+    if (productToDelete) {
+      try {
+        await deleteProduct.mutateAsync(productToDelete)
+        setDeleteDialogOpen(false)
+        setProductToDelete(null)
+      } catch (error) {
+        console.error('Error deleting product:', error)
+      }
+    }
+  }, [productToDelete, deleteProduct])
+
+  const cancelDelete = useCallback(() => {
+    setDeleteDialogOpen(false)
+    setProductToDelete(null)
+  }, [])
+
+  const columns = useMemo<ColumnDef<any, any>[]>(
+    () => [
       {
         accessorKey: 'id',
         header: 'ID',
         cell: ({ row }: any) => (
-          <Box className='h-full w-full p-3 -m-3'>
-            <Typography className='font-medium' color='text.primary'>
-              {row.original.id}
-            </Typography>
-          </Box>
+          <Typography className='font-medium' color='text.primary'>
+            {row.original.id}
+          </Typography>
         )
       },
       {
-        accessorKey: 'category',
+        accessorKey: 'gender',
         header: 'Tienda',
-        cell: ({ row }: any) => (
-          <Box className='h-full w-full p-3 -m-3'>
+        cell: ({ row }: any) => {
+          const gender = row.original.gender
+          const isWomen = gender === 'WOMEN' || gender === 'MUJERES' || gender === 'F'
+
+          return (
             <Chip
-              label={
-                row.original.category === 'Electronics' ||
-                row.original.category === 'Office' ||
-                row.original.category === 'Games'
-                  ? 'HOMBRES'
-                  : 'MUJERES'
-              }
+              label={isWomen ? 'MUJERES' : 'HOMBRES'}
               variant='tonal'
-              color={
-                row.original.category === 'Electronics' ||
-                row.original.category === 'Office' ||
-                row.original.category === 'Games'
-                  ? 'primary'
-                  : 'error'
-              }
+              color={isWomen ? 'error' : 'primary'}
               size='small'
             />
-          </Box>
-        )
+          )
+        }
       },
       {
-        accessorKey: 'productName',
+        accessorKey: 'name',
         header: 'Nombre',
         cell: ({ row }: any) => (
-          <Box className='h-full w-full p-3 -m-3'>
-            <Typography className='font-medium' color='text.primary'>
-              {row.original.productName}
-            </Typography>
-          </Box>
-        )
+          <Typography className='font-medium' color='text.primary'>
+            {row.original.name}
+          </Typography>
+        ),
+        filterFn: 'fuzzy'
       },
       {
         accessorKey: 'price',
-        header: 'Costo',
+        header: 'Precio',
         cell: ({ row }: any) => (
-          <Box className='h-full w-full p-3 -m-3'>
-            <Typography className='font-medium' color='text.primary'>
-              {row.original.price}
-            </Typography>
-          </Box>
+          <Typography className='font-medium' color='text.primary'>
+            ${row.original.price}
+          </Typography>
         )
       },
       {
-        accessorKey: 'productBrand',
+        accessorKey: 'description',
         header: 'Descripción',
         cell: ({ row }: any) => (
-          <Box className='h-full w-full p-3 -m-3' sx={{ maxWidth: 300 }}>
-            <Typography variant='body2' className='truncate' title={row.original.productBrand} color='text.secondary'>
-              {row.original.productBrand}
+          <Box sx={{ maxWidth: 300 }}>
+            <Typography variant='body2' className='truncate' title={row.original.description} color='text.secondary'>
+              {row.original.description}
             </Typography>
           </Box>
-        )
-      }
-    ]
+        ),
+        filterFn: 'fuzzy'
+      },
+      {
+        accessorKey: 'enabled',
+        header: 'Estado',
+        cell: ({ row }: any) => (
+          <Chip
+            label={row.original.enabled ? 'Activo' : 'Inactivo'}
+            color={row.original.enabled ? 'success' : 'error'}
+            size='small'
+          />
+        ),
+        filterFn: (row: any, columnId: string, filterValue: any) => {
+          if (filterValue === undefined || filterValue === '') return true
 
-    // Solo agregar columna de acciones cuando NO hay filtros activos Y estamos en cliente
-    if (!hasActiveFilters && isClient) {
-      baseColumns.push({
+          return row.getValue(columnId) === filterValue
+        }
+      },
+      {
         id: 'actions',
         header: 'Acciones',
+        enableSorting: false,
         cell: ({ row }: any) => (
-          <Box className='flex items-center gap-2'>
+          <Box className='flex gap-2'>
             <IconButton
-              onClick={() => handleEdit(row.original.id)}
               size='small'
-              sx={{
-                color: theme.palette.primary.main,
-                '&:hover': {
-                  backgroundColor: theme.palette.primary.light + '20'
-                }
+              onClick={e => {
+                e.stopPropagation()
+                router.push(`/products/edit/${row.original.id}`)
               }}
+              color='primary'
             >
               <i className='tabler-edit' />
             </IconButton>
             <IconButton
-              onClick={() => {
-                const newData = data.filter(product => product.id !== row.original.id)
-                const newFiltered = filteredData.filter(product => product.id !== row.original.id)
-
-                setData(newData)
-                setFilteredData(newFiltered)
-                console.log('Eliminando producto:', row.original.id)
-              }}
               size='small'
-              sx={{
-                color: theme.palette.error.main,
-                '&:hover': {
-                  backgroundColor: theme.palette.error.light + '20'
-                }
+              onClick={e => {
+                e.stopPropagation()
+                handleDelete(row.original.id)
               }}
+              color='error'
             >
               <i className='tabler-trash' />
             </IconButton>
           </Box>
-        ),
-        enableSorting: false
-      } as any)
-    }
-
-    return baseColumns
-  }, [data, filteredData, hasActiveFilters, handleEdit, theme, isClient])
-
-  // Determinar datos a usar
-  const tableData = hasActiveFilters ? filteredData : data
+        )
+      }
+    ],
+    [router, handleDelete]
+  )
 
   const table = useReactTable({
-    data: tableData,
+    data: allProducts ?? [],
     columns,
     filterFns: {
       fuzzy: fuzzyFilter
     },
     state: {
-      globalFilter
-    },
-    initialState: {
-      pagination: {
-        pageSize: hasActiveFilters ? 50 : 10
-      }
+      globalFilter,
+      columnFilters
     },
     enableRowSelection: false,
-    enableSorting: !hasActiveFilters,
+    enableSorting: true,
     globalFilterFn: fuzzyFilter,
     getCoreRowModel: getCoreRowModel(),
     onGlobalFilterChange: setGlobalFilter,
-    getFilteredRowModel: getFilteredRowModel(),
+    onColumnFiltersChange: setColumnFilters,
     getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
-    getFacetedMinMaxValues: getFacetedMinMaxValues()
+    getFacetedMinMaxValues: getFacetedMinMaxValues(),
+    initialState: {
+      pagination: {
+        pageSize: 10
+      }
+    }
   })
 
-  useEffect(() => {
-    if (!hasActiveFilters) {
-      setFilteredData(data)
-    }
-  }, [data, hasActiveFilters])
+  const renderSkeleton = () => (
+    <tbody>
+      {Array.from({ length: table.getState().pagination.pageSize }).map((_, index) => (
+        <tr key={index}>
+          {columns.map((_, colIndex) => (
+            <td key={colIndex} className='p-4'>
+              <Skeleton variant='text' width='100%' height={20} />
+            </td>
+          ))}
+        </tr>
+      ))}
+    </tbody>
+  )
 
-  if (!isClient) {
+  if (error) {
     return (
       <Card>
-        <Box sx={{ p: 4 }}>Cargando...</Box>
+        <Box sx={{ p: 4 }}>
+          <Alert severity='error'>
+            Error al cargar los productos: {error instanceof Error ? error.message : 'Error desconocido'}
+          </Alert>
+        </Box>
       </Card>
     )
   }
 
-  const tableContent = hasActiveFilters ? (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragEnd={handleDragEnd}
-      modifiers={[restrictToVerticalAxis]}
-    >
-      <SortableContext items={tableData.map(item => item.id)} strategy={verticalListSortingStrategy}>
-        <div className='overflow-x-auto'>
-          <table className={tableStyles.table}>
-            <thead>
-              {table.getHeaderGroups().map(headerGroup => (
-                <tr key={headerGroup.id}>
-                  <th style={{ width: '40px', padding: theme.spacing(1) }}>
-                    <IconButton size='small' disabled>
-                      <i className='tabler-arrows-sort' style={{ color: theme.palette.text.disabled }} />
-                    </IconButton>
-                  </th>
-                  {headerGroup.headers.map(header => (
-                    <th key={header.id} className={tableStyles.cell}>
-                      {header.isPlaceholder ? null : (
-                        <Box className='flex items-center' sx={{ color: theme.palette.text.primary }}>
-                          {flexRender(header.column.columnDef.header, header.getContext())}
-                        </Box>
-                      )}
-                    </th>
-                  ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody>
-              {table.getRowModel().rows.map(row => (
-                <SortableRow key={row.original.id} row={row} isDragMode={true}>
-                  {row.getVisibleCells().map(cell => (
-                    <td key={cell.id} className={tableStyles.cell}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
-                  ))}
-                </SortableRow>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </SortableContext>
-    </DndContext>
-  ) : (
-    <div className='overflow-x-auto'>
-      <table className={tableStyles.table}>
-        <thead>
-          {table.getHeaderGroups().map(headerGroup => (
-            <tr key={headerGroup.id}>
-              {headerGroup.headers.map(header => (
-                <th key={header.id} className={tableStyles.cell}>
-                  {header.isPlaceholder ? null : (
-                    <Box
-                      className={classnames({
-                        'flex items-center': header.column.getIsSorted(),
-                        'cursor-pointer select-none': header.column.getCanSort()
-                      })}
-                      onClick={header.column.getToggleSortingHandler()}
-                      sx={{
-                        color: theme.palette.text.primary,
-                        '&:hover': header.column.getCanSort() ? { color: theme.palette.primary.main } : {}
-                      }}
-                    >
-                      {flexRender(header.column.columnDef.header, header.getContext())}
-                      {{
-                        asc: <i className='tabler-chevron-up text-xl' />,
-                        desc: <i className='tabler-chevron-down text-xl' />
-                      }[header.column.getIsSorted() as 'asc' | 'desc'] ?? null}
-                    </Box>
-                  )}
-                </th>
-              ))}
-            </tr>
-          ))}
-        </thead>
-        <tbody>
-          {table.getRowModel().rows.map(row => (
-            <SortableRow key={row.original.id} row={row} isDragMode={false}>
-              {row.getVisibleCells().map(cell => (
-                <td key={cell.id} className={tableStyles.cell}>
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </td>
-              ))}
-            </SortableRow>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-
   return (
     <Card>
-      <CardHeader title='Filtros' />
-      <TableFilters setData={setFilteredData} productData={data} onFiltersChange={setHasFiltersFromComponent} />
+      <CardHeader title='Productos' />
+      <Box className='flex gap-4 p-6'>
+        <CustomTextField
+          select
+          label='Estado'
+          value={
+            columnFilters.find(f => f.id === 'enabled')?.value === undefined
+              ? ''
+              : String(columnFilters.find(f => f.id === 'enabled')?.value)
+          }
+          onChange={e => {
+            const value = e.target.value
+
+            table.getColumn('enabled')?.setFilterValue(value === '' ? undefined : value === 'true')
+          }}
+          size='small'
+          className='min-w-[150px]'
+        >
+          <MenuItem value=''>Todos</MenuItem>
+          <MenuItem value='true'>Activos</MenuItem>
+          <MenuItem value='false'>Inactivos</MenuItem>
+        </CustomTextField>
+      </Box>
       <Divider />
-
-      {hasActiveFilters && (
-        <StyledAlert severity='info' icon={<i className='tabler-arrows-move' />}>
-          <Typography variant='body2'>Modo reordenamiento activo: Arrastra las filas para cambiar el orden</Typography>
-        </StyledAlert>
-      )}
-
       <Box className='flex flex-wrap justify-between gap-4 p-6'>
         <DebouncedInput
           value={globalFilter ?? ''}
@@ -482,36 +324,112 @@ const ProductListTable = ({ productData }: { productData?: ProductType[] }) => {
           className='max-sm:is-full'
           size='small'
         />
-        <Box className='flex flex-wrap items-center max-sm:flex-col gap-4 max-sm:is-full is-auto'>
-          {!hasActiveFilters && (
-            <CustomTextField
-              select
-              value={table.getState().pagination.pageSize}
-              onChange={e => table.setPageSize(Number(e.target.value))}
-              className='flex-auto is-[70px] max-sm:is-full'
-              size='small'
-            >
-              <MenuItem value='10'>10</MenuItem>
-              <MenuItem value='25'>25</MenuItem>
-              <MenuItem value='50'>50</MenuItem>
-            </CustomTextField>
-          )}
-        </Box>
+        <CustomTextField
+          select
+          value={table.getState().pagination.pageSize}
+          onChange={e => table.setPageSize(Number(e.target.value))}
+          className='is-[70px]'
+          size='small'
+        >
+          <MenuItem value={10}>10</MenuItem>
+          <MenuItem value={25}>25</MenuItem>
+          <MenuItem value={50}>50</MenuItem>
+          <MenuItem value={100}>100</MenuItem>
+        </CustomTextField>
       </Box>
-
-      {tableContent}
-
-      {!hasActiveFilters && (
-        <TablePagination
-          component={() => <TablePaginationComponent table={table as any} />}
-          count={table.getFilteredRowModel().rows.length}
-          rowsPerPage={table.getState().pagination.pageSize}
-          page={table.getState().pagination.pageIndex}
-          onPageChange={(_, page) => {
-            table.setPageIndex(page)
-          }}
-        />
+      {isFetching && !isLoading && (
+        <Box sx={{ px: 3, pb: 2 }}>
+          <Alert severity='info'>Actualizando datos...</Alert>
+        </Box>
       )}
+      <div className='overflow-x-auto'>
+        <table className={tableStyles.table}>
+          <thead>
+            {table.getHeaderGroups().map(headerGroup => (
+              <tr key={headerGroup.id}>
+                {headerGroup.headers.map(header => (
+                  <th key={header.id} className={tableStyles.cell}>
+                    {header.isPlaceholder ? null : (
+                      <Box
+                        className={classnames({
+                          'flex items-center cursor-pointer select-none': header.column.getCanSort()
+                        })}
+                        onClick={header.column.getToggleSortingHandler()}
+                        sx={{ color: theme.palette.text.primary }}
+                      >
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                        {{
+                          asc: <i className='tabler-chevron-up text-xl' />,
+                          desc: <i className='tabler-chevron-down text-xl' />
+                        }[header.column.getIsSorted() as 'asc' | 'desc'] ?? null}
+                      </Box>
+                    )}
+                  </th>
+                ))}
+              </tr>
+            ))}
+          </thead>
+          {isLoading ? (
+            renderSkeleton()
+          ) : table.getRowModel().rows.length === 0 ? (
+            <tbody>
+              <tr>
+                <td colSpan={columns.length} className='text-center'>
+                  <Typography color='text.secondary' sx={{ py: 4 }}>
+                    No hay productos disponibles
+                  </Typography>
+                </td>
+              </tr>
+            </tbody>
+          ) : (
+            <tbody>
+              {table.getRowModel().rows.map(row => (
+                <tr
+                  key={row.original.id}
+                  className={`transition-colors cursor-pointer hover:bg-[rgba(255,255,255,0.05)] dark:hover:bg-[rgba(0,0,0,0.04)]`}
+                  onClick={() => handleCellClick(row)}
+                >
+                  {row.getVisibleCells().map(cell => (
+                    <td key={cell.id} className={tableStyles.cell}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          )}
+        </table>
+      </div>
+      <TablePagination
+        component='div'
+        count={table.getFilteredRowModel().rows.length}
+        rowsPerPage={table.getState().pagination.pageSize}
+        page={table.getState().pagination.pageIndex}
+        onPageChange={(_, newPage) => table.setPageIndex(newPage)}
+        onRowsPerPageChange={event => {
+          table.setPageSize(parseInt(event.target.value, 10))
+        }}
+        rowsPerPageOptions={[10, 25, 50, 100]}
+        labelRowsPerPage='Filas por página:'
+        labelDisplayedRows={({ from, to, count }) => `${from}–${to} de ${count}`}
+      />
+
+      <Dialog open={deleteDialogOpen} onClose={cancelDelete}>
+        <DialogTitle>Confirmar eliminación</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            ¿Estás seguro de que deseas eliminar este producto? Esta acción no se puede deshacer.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={cancelDelete} color='secondary'>
+            Cancelar
+          </Button>
+          <Button onClick={confirmDelete} color='error' variant='contained'>
+            Eliminar
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Card>
   )
 }

@@ -49,7 +49,6 @@ declare module '@tanstack/table-core' {
   }
 }
 
-// Tipo para ventas
 type SaleType = {
   id: number
   estado: 'PENDIENTE' | 'RECHAZADO' | 'PAGADO'
@@ -65,15 +64,12 @@ type SaleWithActionsType = SaleType & {
 }
 
 const fuzzyFilter: FilterFn<any> = (row, columnId, value, addMeta) => {
-  // Rank the item
   const itemRank = rankItem(row.getValue(columnId), value)
 
-  // Store the itemRank info
   addMeta({
     itemRank
   })
 
-  // Return if the item should be filtered in/out
   return itemRank.passed
 }
 
@@ -106,7 +102,6 @@ const DebouncedInput = ({
   return <CustomTextField {...props} value={value} onChange={e => setValue(e.target.value)} />
 }
 
-// Datos de ejemplo basados en la imagen
 const salesData: SaleType[] = [
   {
     id: 219,
@@ -200,7 +195,6 @@ const salesData: SaleType[] = [
   }
 ]
 
-// Función para obtener color del estado
 const getEstadoColor = (estado: string): 'primary' | 'error' | 'success' => {
   switch (estado) {
     case 'PENDIENTE':
@@ -214,7 +208,6 @@ const getEstadoColor = (estado: string): 'primary' | 'error' | 'success' => {
   }
 }
 
-// Column Definitions
 const columnHelper = createColumnHelper<SaleWithActionsType>()
 
 const SalesListTable = () => {
@@ -224,7 +217,6 @@ const SalesListTable = () => {
   const [selectedSale, setSelectedSale] = useState<SaleType | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
 
-  // Función para manejar clics en celdas y mostrar detalles
   const handleCellClick = (row: any) => {
     setSelectedSale(row.original)
     setModalOpen(true)

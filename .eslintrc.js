@@ -7,8 +7,8 @@ module.exports = {
     'next/core-web-vitals'
   ],
   rules: {
-    '@typescript-eslint/no-unused-vars': 'warn', // Cambia de 'error' a 'warn'
-    'react-hooks/exhaustive-deps': 'warn', // Mantiene como warning
+    '@typescript-eslint/no-unused-vars': 'warn',
+    'react-hooks/exhaustive-deps': 'warn',
     'jsx-a11y/alt-text': 'off',
     'react/display-name': 'off',
     'react/no-children-prop': 'off',
