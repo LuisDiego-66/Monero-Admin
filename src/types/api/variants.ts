@@ -1,28 +1,14 @@
 export interface VariantSize {
-  size: string
-  quantity: number
+  id?: number
+  size:
+    | {
+        id: number
+        name: string
+      }
+    | string
+  availableStock?: number
+  quantity?: number
 }
-
-export interface Variant {
-  id?: string
-  multimedia: string[]
-  variants: VariantSize[]
-  colorName: string
-  colorCode: string
-  productId: number
-  createdAt?: string
-  updatedAt?: string
-}
-
-export interface CreateVariantDto {
-  multimedia: string[]
-  variants: VariantSize[]
-  colorName: string
-  colorCode: string
-  productId: number
-}
-
-export interface UpdateVariantDto extends Partial<CreateVariantDto> {}
 
 export interface Color {
   id: number
@@ -30,6 +16,34 @@ export interface Color {
   code: string
   enabled?: boolean
 }
+
+export interface Variant {
+  id?: number
+  multimedia: string[]
+  pdfs: string[]
+  color: Color
+  colorName?: string
+  colorCode?: string
+  variants: VariantSize[]
+  product?: any
+  productId?: number
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface CreateVariantDto {
+  multimedia: string[]
+  pdfs: string[]
+  variants: {
+    size: string
+    quantity: number
+  }[]
+  colorName: string
+  colorCode: string
+  productId: number
+}
+
+export interface UpdateVariantDto extends Partial<CreateVariantDto> {}
 
 export interface Brand {
   id: number
@@ -45,8 +59,8 @@ export interface CreateBrandDto {
 
 export interface MultimediaUploadResponse {
   url: string
-  filename: string
-  originalName: string
+  filename?: string
+  originalName?: string
 }
 
 export interface VariantsResponse {

@@ -29,11 +29,9 @@ import {
   flexRender,
   getCoreRowModel,
   useReactTable,
-  getFilteredRowModel,
   getFacetedRowModel,
   getFacetedUniqueValues,
   getFacetedMinMaxValues,
-  getPaginationRowModel,
   getSortedRowModel
 } from '@tanstack/react-table'
 import type { ColumnDef, FilterFn, ColumnFiltersState } from '@tanstack/react-table'
@@ -90,13 +88,33 @@ const DebouncedInput = ({
 const ProductListTable = () => {
   const router = useRouter()
   const theme = useTheme()
-  const [globalFilter, setGlobalFilter] = useState('')
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [search, setSearch] = useState('')
+
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [productToDelete, setProductToDelete] = useState<number | null>(null)
 
+  const queryParams = useMemo(
+    () => ({
+      limit: pageSize,
+      page: page,
+      search: search
+    }),
+    [pageSize, page, search]
+  )
+
   const deleteProduct = useDeleteProduct()
-  const { data: allProducts, isLoading, error, isFetching } = useProducts()
+
+  const { data: productsData, isLoading, error, isFetching } = useProducts(queryParams)
+
+  const allProducts = useMemo(() => {
+    return productsData?.products || []
+  }, [productsData])
+
+  const totalRecords = useMemo(() => {
+    return productsData?.total || 0
+  }, [productsData])
 
   const handleCellClick = useCallback(
     (row: any) => {
@@ -142,8 +160,8 @@ const ProductListTable = () => {
         accessorKey: 'gender',
         header: 'Tienda',
         cell: ({ row }: any) => {
-          const gender = row.original.gender
-          const isWomen = gender === 'WOMEN' || gender === 'MUJERES' || gender === 'F'
+          const gender = row.original.subcategory.category.gender
+          const isWomen = gender === 'female'
 
           return (
             <Chip
@@ -236,37 +254,26 @@ const ProductListTable = () => {
   )
 
   const table = useReactTable({
-    data: allProducts ?? [],
+    data: allProducts,
     columns,
     filterFns: {
       fuzzy: fuzzyFilter
     },
-    state: {
-      globalFilter,
-      columnFilters
-    },
+    state: {},
     enableRowSelection: false,
     enableSorting: true,
-    globalFilterFn: fuzzyFilter,
     getCoreRowModel: getCoreRowModel(),
-    onGlobalFilterChange: setGlobalFilter,
-    onColumnFiltersChange: setColumnFilters,
+
     getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
+
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
-    getFacetedMinMaxValues: getFacetedMinMaxValues(),
-    initialState: {
-      pagination: {
-        pageSize: 10
-      }
-    }
+    getFacetedMinMaxValues: getFacetedMinMaxValues()
   })
 
   const renderSkeleton = () => (
     <tbody>
-      {Array.from({ length: table.getState().pagination.pageSize }).map((_, index) => (
+      {Array.from({ length: pageSize }).map((_, index) => (
         <tr key={index}>
           {columns.map((_, colIndex) => (
             <td key={colIndex} className='p-4'>
@@ -293,41 +300,29 @@ const ProductListTable = () => {
   return (
     <Card>
       <CardHeader title='Productos' />
-      <Box className='flex gap-4 p-6'>
-        <CustomTextField
-          select
-          label='Estado'
-          value={
-            columnFilters.find(f => f.id === 'enabled')?.value === undefined
-              ? ''
-              : String(columnFilters.find(f => f.id === 'enabled')?.value)
-          }
-          onChange={e => {
-            const value = e.target.value
 
-            table.getColumn('enabled')?.setFilterValue(value === '' ? undefined : value === 'true')
-          }}
-          size='small'
-          className='min-w-[150px]'
-        >
-          <MenuItem value=''>Todos</MenuItem>
-          <MenuItem value='true'>Activos</MenuItem>
-          <MenuItem value='false'>Inactivos</MenuItem>
-        </CustomTextField>
-      </Box>
-      <Divider />
       <Box className='flex flex-wrap justify-between gap-4 p-6'>
         <DebouncedInput
-          value={globalFilter ?? ''}
-          onChange={value => setGlobalFilter(String(value))}
+          value={search}
+          onChange={value => {
+            const newSearch = String(value)
+
+            if (newSearch !== search) {
+              setSearch(newSearch)
+              setPage(1)
+            }
+          }}
           placeholder='Buscar Producto'
           className='max-sm:is-full'
           size='small'
         />
         <CustomTextField
           select
-          value={table.getState().pagination.pageSize}
-          onChange={e => table.setPageSize(Number(e.target.value))}
+          value={pageSize}
+          onChange={e => {
+            setPageSize(Number(e.target.value))
+            setPage(1)
+          }}
           className='is-[70px]'
           size='small'
         >
@@ -402,12 +397,15 @@ const ProductListTable = () => {
       </div>
       <TablePagination
         component='div'
-        count={table.getFilteredRowModel().rows.length}
-        rowsPerPage={table.getState().pagination.pageSize}
-        page={table.getState().pagination.pageIndex}
-        onPageChange={(_, newPage) => table.setPageIndex(newPage)}
+        count={totalRecords}
+        rowsPerPage={pageSize}
+        page={page - 1}
+        onPageChange={(_, newPage) => {
+          setPage(newPage + 1)
+        }}
         onRowsPerPageChange={event => {
-          table.setPageSize(parseInt(event.target.value, 10))
+          setPageSize(parseInt(event.target.value, 10))
+          setPage(1)
         }}
         rowsPerPageOptions={[10, 25, 50, 100]}
         labelRowsPerPage='Filas por página:'

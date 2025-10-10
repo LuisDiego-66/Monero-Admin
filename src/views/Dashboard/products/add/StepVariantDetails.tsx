@@ -12,7 +12,6 @@ import Dialog from '@mui/material/Dialog'
 import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
 import DialogActions from '@mui/material/DialogActions'
-import Chip from '@mui/material/Chip'
 import Alert from '@mui/material/Alert'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
@@ -35,7 +34,8 @@ import {
   useCreateVariant,
   useVariantsByProduct,
   useUpdateVariant,
-  useDeleteVariant
+  useVariantById,
+  useColorById
 } from '@/hooks/useVariants'
 import type { VariantSize, Color, Variant } from '@/types/api/variants'
 
@@ -56,6 +56,7 @@ type MediaFile = {
   url: string
   type: 'image' | 'video' | 'document'
   name: string
+  source: 'existing' | 'new'
 }
 
 type VariantForm = {
@@ -79,8 +80,8 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
 
   const [isEditing, setIsEditing] = useState(false)
   const [editingVariantId, setEditingVariantId] = useState<number | null>(null)
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
-  const [variantToDelete, setVariantToDelete] = useState<number | null>(null)
+  const [variantToLoadId, setVariantToLoadId] = useState<number | null>(null)
+  const [colorToLoadId, setColorToLoadId] = useState<number | null>(null)
 
   const [isDragging, setIsDragging] = useState(false)
   const [colorModalOpen, setColorModalOpen] = useState(false)
@@ -90,49 +91,44 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
   const { data: colors, isLoading: colorsLoading } = useColors()
   const { data: existingVariants, isLoading: variantsLoading } = useVariantsByProduct(productId)
   const uploadMultimedia = useUploadMultimedia()
+  const { data: variantToLoad, isLoading: variantLoading } = useVariantById(variantToLoadId)
+  const { data: colorToLoad } = useColorById(colorToLoadId)
+
   const createVariant = useCreateVariant()
   const updateVariant = useUpdateVariant()
-  const deleteVariant = useDeleteVariant()
 
   const isCreateMode = mode === 'create'
 
+  const detectFileType = (url: string): 'image' | 'video' | 'document' => {
+    const ext = url.split('.').pop()?.toLowerCase() || ''
+
+    if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext)) return 'image'
+    if (['mp4', 'webm', 'mov'].includes(ext)) return 'video'
+    if (ext === 'pdf') return 'document'
+
+    return 'image'
+  }
+
   const handleEditVariant = (variant: Variant) => {
-    const mediaFiles: MediaFile[] = variant.multimedia.map((url, idx) => ({
-      id: `existing-${idx}`,
-      file: null,
-      url: url,
-      type: 'image' as const,
-      name: `existing-${idx}.jpg`
-    }))
-
-    setVariantForm({
-      colorId: 'custom',
-      customColorName: variant.colorName,
-      customColorCode: variant.colorCode,
-      sizes: [...variant.variants],
-      mediaFiles: mediaFiles
-    })
-
-    setIsEditing(true)
-    setEditingVariantId(Number(variant.id!))
-    toast.info(`Editando variante: ${variant.colorName}`)
+    if (variant.id) {
+      setVariantToLoadId(Number(variant.id))
+    }
   }
 
   const handleClearForm = () => {
-    setVariantForm({
-      colorId: '',
-      sizes: [{ size: 'S', quantity: 5 }],
-      mediaFiles: []
-    })
-    setIsEditing(false)
-    setEditingVariantId(null)
-
-    // Limpiar URLs de archivos
     variantForm.mediaFiles.forEach(file => {
       if (file.file) {
         URL.revokeObjectURL(file.url)
       }
     })
+
+    setVariantForm({
+      colorId: '',
+      sizes: [],
+      mediaFiles: []
+    })
+    setIsEditing(false)
+    setEditingVariantId(null)
   }
 
   const isValidFileType = (file: File): boolean => {
@@ -151,7 +147,8 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
           file,
           url: URL.createObjectURL(file),
           type: file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : 'document',
-          name: file.name
+          name: file.name,
+          source: 'new' as const
         }
 
         newFiles.push(mediaFile)
@@ -237,7 +234,17 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
   const handleSizeChange = (index: number, field: keyof VariantSize, value: any) => {
     setVariantForm(prev => ({
       ...prev,
-      sizes: prev.sizes.map((size, i) => (i === index ? { ...size, [field]: value } : size))
+      sizes: prev.sizes.map((size, i) => {
+        if (i === index) {
+          if (field === 'quantity') {
+            return { ...size, [field]: value || 0 }
+          }
+
+          return { ...size, [field]: value }
+        }
+
+        return size
+      })
     }))
   }
 
@@ -269,7 +276,7 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
       return
     }
 
-    if (variantForm.sizes.some(s => !s.size || s.quantity < 0)) {
+    if (variantForm.sizes.some(s => !s.size || (s.quantity ?? 0) < 0)) {
       toast.error('Completa todas las tallas y stocks')
 
       return
@@ -282,37 +289,56 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
     }
 
     try {
-      let multimediaUrls: string[] = []
-      const newFiles = variantForm.mediaFiles.filter(f => f.file !== null)
-      const existingUrls = variantForm.mediaFiles.filter(f => f.file === null).map(f => f.url)
+      const newMultimediaFiles = variantForm.mediaFiles.filter(f => f.source === 'new' && f.type !== 'document')
+      const newPdfFiles = variantForm.mediaFiles.filter(f => f.source === 'new' && f.type === 'document')
 
-      if (newFiles.length > 0) {
-        const uploadedFiles = await uploadMultimedia.mutateAsync(newFiles.map(f => f.file!))
+      const existingMultimediaUrls = variantForm.mediaFiles
+        .filter(f => f.source === 'existing' && f.type !== 'document')
+        .map(f => f.url)
 
-        const newUrls = uploadedFiles.map((file: any) => {
-          if (typeof file === 'string') {
-            return file
-          } else if (file && typeof file.url === 'string') {
-            return file.url
-          } else {
-            throw new Error('Formato de respuesta de multimedia inválido')
-          }
-        })
+      const existingPdfUrls = variantForm.mediaFiles
+        .filter(f => f.source === 'existing' && f.type === 'document')
+        .map(f => f.url)
 
-        multimediaUrls = [...existingUrls, ...newUrls]
-      } else {
-        multimediaUrls = existingUrls
+      let uploadedMultimediaUrls: string[] = []
+      let uploadedPdfUrls: string[] = []
+
+      if (newMultimediaFiles.length > 0) {
+        const uploaded = await uploadMultimedia.mutateAsync(newMultimediaFiles.map(f => f.file!))
+
+        uploadedMultimediaUrls = uploaded.map((file: any) => (typeof file === 'string' ? file : file.url))
       }
 
-      multimediaUrls = multimediaUrls.filter(url => typeof url === 'string' && url.length > 0 && url.startsWith('http'))
+      if (newPdfFiles.length > 0) {
+        const uploaded = await uploadMultimedia.mutateAsync(newPdfFiles.map(f => f.file!))
+
+        uploadedPdfUrls = uploaded.map((file: any) => (typeof file === 'string' ? file : file.url))
+      }
+
+      const finalMultimediaUrls = [...existingMultimediaUrls, ...uploadedMultimediaUrls].filter(
+        url => typeof url === 'string' && url.startsWith('http')
+      )
+
+      const finalPdfUrls = [...existingPdfUrls, ...uploadedPdfUrls].filter(
+        url => typeof url === 'string' && url.startsWith('http')
+      )
+
+      const normalizedVariants = variantForm.sizes.map(s => ({
+        size: typeof s.size === 'object' ? s.size.name : s.size,
+        quantity: s.quantity || 0
+      }))
 
       const variantData = {
-        multimedia: multimediaUrls,
-        variants: variantForm.sizes,
+        multimedia: finalMultimediaUrls,
+        pdfs: finalPdfUrls,
+        variants: normalizedVariants,
         colorName: selectedColor.name,
         colorCode: selectedColor.code,
         productId: parseInt(productId!)
       }
+
+      /*   console.log(' Datos a enviar:', variantData)
+      console.log(' PDFs:', finalPdfUrls) */
 
       if (isEditing && editingVariantId) {
         await updateVariant.mutateAsync({
@@ -340,26 +366,12 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
           toast.error('Datos inválidos. Verifica todos los campos.')
         }
       } else if (error?.message?.includes('multimedia')) {
-        toast.error('Error al procesar las imágenes. Inténtalo de nuevo.')
+        toast.error('Error al procesar los archivos. Inténtalo de nuevo.')
       } else {
         toast.error(isEditing ? 'Error al actualizar la variante' : 'Error al guardar la variante')
       }
 
       console.error('Error completo:', error)
-    }
-  }
-
-  const handleDeleteVariant = async () => {
-    if (!variantToDelete) return
-
-    try {
-      await deleteVariant.mutateAsync(variantToDelete)
-      toast.success('Variante eliminada exitosamente')
-      setDeleteConfirmOpen(false)
-      setVariantToDelete(null)
-    } catch (error) {
-      toast.error('Error al eliminar la variante')
-      console.error(error)
     }
   }
 
@@ -399,6 +411,71 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
       })
     }
   }, [])
+  useEffect(() => {
+    if (variantToLoad && variantToLoadId) {
+      const multimediaFiles: MediaFile[] = variantToLoad.multimedia.map((url, idx) => ({
+        id: `existing-multimedia-${idx}`,
+        file: null,
+        url: url,
+        type: detectFileType(url),
+        name: url.split('/').pop() || `multimedia-${idx}`,
+        source: 'existing' as const
+      }))
+
+      const pdfFiles: MediaFile[] = (variantToLoad.pdfs || []).map((url, idx) => ({
+        id: `existing-pdf-${idx}`,
+        file: null,
+        url: url,
+        type: 'document' as const,
+        name: url.split('/').pop() || `document-${idx}.pdf`,
+        source: 'existing' as const
+      }))
+
+      const normalizedSizes = (variantToLoad.variants || []).map(v => ({
+        id: v.id,
+        size: typeof v.size === 'object' ? v.size.name : v.size,
+        quantity: v.availableStock || v.quantity || 0
+      }))
+
+      setVariantForm({
+        colorId: '',
+        sizes: normalizedSizes,
+        mediaFiles: [...multimediaFiles, ...pdfFiles]
+      })
+
+      setIsEditing(true)
+      setEditingVariantId(variantToLoadId)
+
+      if (variantToLoad.color?.id) {
+        setColorToLoadId(variantToLoad.color.id)
+      }
+
+      setVariantToLoadId(null)
+    }
+  }, [variantToLoad, variantToLoadId])
+
+  useEffect(() => {
+    if (colorToLoad && colorToLoadId) {
+      const colorExistsInList = colors?.some(c => c.id === colorToLoadId)
+
+      if (colorExistsInList) {
+        setVariantForm(prev => ({
+          ...prev,
+          colorId: colorToLoadId.toString()
+        }))
+      } else {
+        setVariantForm(prev => ({
+          ...prev,
+          colorId: 'custom',
+          customColorName: colorToLoad.name,
+          customColorCode: colorToLoad.code
+        }))
+      }
+
+      toast.info(`Color cargado: ${colorToLoad.name}`)
+      setColorToLoadId(null)
+    }
+  }, [colorToLoad, colorToLoadId, colors])
 
   if (isCreateMode && !productCreated) {
     return (
@@ -435,7 +512,6 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
         </Grid>
       )}
 
-      {/* Formulario de variante */}
       <Grid size={{ xs: 12, lg: 7 }}>
         <Card>
           <CardHeader
@@ -496,67 +572,111 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
               />
 
               {variantForm.mediaFiles.length > 0 && (
-                <Grid container spacing={2} sx={{ mt: 2 }}>
-                  {variantForm.mediaFiles.map(file => (
-                    <Grid size={{ xs: 6, sm: 4, md: 3 }} key={file.id}>
-                      <Box
-                        sx={{
-                          position: 'relative',
-                          width: '100%',
-                          height: '120px',
-                          border: '1px solid',
-                          borderColor: 'divider',
-                          borderRadius: 1,
-                          overflow: 'hidden'
-                        }}
-                      >
-                        {file.type === 'image' ? (
-                          <img
-                            src={file.url}
-                            alt={file.name}
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                          />
-                        ) : file.type === 'video' ? (
-                          <video src={file.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        ) : (
-                          <Box
-                            sx={{
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              height: '100%',
-                              backgroundColor: 'rgba(0,0,0,0.1)'
-                            }}
-                          >
-                            <i
-                              className='tabler-file-text'
-                              style={{ fontSize: '2rem', color: 'var(--mui-palette-primary-main)' }}
-                            />
-                            <Typography variant='caption' sx={{ mt: 1, textAlign: 'center' }}>
-                              {file.name.length > 15 ? file.name.substring(0, 15) + '...' : file.name}
-                            </Typography>
-                          </Box>
-                        )}
-                        <IconButton
-                          size='small'
-                          color='error'
-                          onClick={() => handleRemoveFile(file.id)}
-                          sx={{
-                            position: 'absolute',
-                            top: 4,
-                            right: 4,
-                            backgroundColor: 'rgba(0,0,0,0.7)',
-                            color: 'white',
-                            '&:hover': { backgroundColor: 'rgba(0,0,0,0.9)' }
-                          }}
-                        >
-                          <i className='tabler-x' style={{ fontSize: '16px' }} />
-                        </IconButton>
-                      </Box>
-                    </Grid>
-                  ))}
-                </Grid>
+                <Box sx={{ mt: 2 }}>
+                  {variantForm.mediaFiles.filter(f => f.type !== 'document').length > 0 && (
+                    <Box sx={{ mb: 3 }}>
+                      <Typography variant='caption' color='primary' sx={{ mb: 1, display: 'block', fontWeight: 600 }}>
+                        🖼️ IMÁGENES Y VIDEOS ({variantForm.mediaFiles.filter(f => f.type !== 'document').length})
+                      </Typography>
+                      <Grid container spacing={2}>
+                        {variantForm.mediaFiles
+                          .filter(f => f.type !== 'document')
+                          .map(file => (
+                            <Grid size={{ xs: 6, sm: 4, md: 3 }} key={file.id}>
+                              <Box
+                                sx={{
+                                  position: 'relative',
+                                  width: '100%',
+                                  height: '120px',
+                                  border: '1px solid',
+                                  borderColor: 'divider',
+                                  borderRadius: 1,
+                                  overflow: 'hidden'
+                                }}
+                              >
+                                {file.type === 'image' ? (
+                                  <img
+                                    src={file.url}
+                                    alt={file.name}
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                  />
+                                ) : (
+                                  <video src={file.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                )}
+                                <IconButton
+                                  size='small'
+                                  color='error'
+                                  onClick={() => handleRemoveFile(file.id)}
+                                  sx={{
+                                    position: 'absolute',
+                                    top: 4,
+                                    right: 4,
+                                    backgroundColor: 'rgba(0,0,0,0.7)',
+                                    color: 'white',
+                                    '&:hover': { backgroundColor: 'rgba(0,0,0,0.9)' }
+                                  }}
+                                >
+                                  <i className='tabler-x' style={{ fontSize: '16px' }} />
+                                </IconButton>
+                              </Box>
+                            </Grid>
+                          ))}
+                      </Grid>
+                    </Box>
+                  )}
+
+                  {variantForm.mediaFiles.filter(f => f.type === 'document').length > 0 && (
+                    <Box>
+                      <Typography variant='caption' color='secondary' sx={{ mb: 1, display: 'block', fontWeight: 600 }}>
+                        📄 DOCUMENTOS PDF ({variantForm.mediaFiles.filter(f => f.type === 'document').length})
+                      </Typography>
+                      <Grid container spacing={2}>
+                        {variantForm.mediaFiles
+                          .filter(f => f.type === 'document')
+                          .map(file => (
+                            <Grid size={{ xs: 6, sm: 4, md: 3 }} key={file.id}>
+                              <Box
+                                sx={{
+                                  position: 'relative',
+                                  width: '100%',
+                                  height: '100px',
+                                  border: '1px solid',
+                                  borderColor: 'divider',
+                                  borderRadius: 1,
+                                  overflow: 'hidden',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  backgroundColor: 'rgba(255,0,0,0.05)'
+                                }}
+                              >
+                                <i className='tabler-file-type-pdf' style={{ fontSize: '2.5rem', color: '#d32f2f' }} />
+                                <Typography variant='caption' sx={{ mt: 1, textAlign: 'center', px: 1 }}>
+                                  {file.name.length > 20 ? file.name.substring(0, 20) + '...' : file.name}
+                                </Typography>
+                                <IconButton
+                                  size='small'
+                                  color='error'
+                                  onClick={() => handleRemoveFile(file.id)}
+                                  sx={{
+                                    position: 'absolute',
+                                    top: 4,
+                                    right: 4,
+                                    backgroundColor: 'rgba(0,0,0,0.7)',
+                                    color: 'white',
+                                    '&:hover': { backgroundColor: 'rgba(0,0,0,0.9)' }
+                                  }}
+                                >
+                                  <i className='tabler-x' style={{ fontSize: '16px' }} />
+                                </IconButton>
+                              </Box>
+                            </Grid>
+                          ))}
+                      </Grid>
+                    </Box>
+                  )}
+                </Box>
               )}
             </Box>
 
@@ -574,6 +694,49 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
                     value={variantForm.colorId}
                     onChange={e => setVariantForm(prev => ({ ...prev, colorId: e.target.value }))}
                     disabled={colorsLoading}
+                    SelectProps={{
+                      renderValue: selected => {
+                        if (!selected) return 'Selecciona un color'
+
+                        if (selected === 'custom' && variantForm.customColorName) {
+                          return (
+                            <Box display='flex' alignItems='center' gap={1}>
+                              <Box
+                                sx={{
+                                  width: 16,
+                                  height: 16,
+                                  borderRadius: '50%',
+                                  backgroundColor: variantForm.customColorCode || '#000000',
+                                  border: '1px solid #ddd'
+                                }}
+                              />
+                              <Typography variant='body2'>{variantForm.customColorName}</Typography>
+                            </Box>
+                          )
+                        }
+
+                        const selectedColor = colors?.find(c => c.id.toString() === selected)
+
+                        if (selectedColor) {
+                          return (
+                            <Box display='flex' alignItems='center' gap={1}>
+                              <Box
+                                sx={{
+                                  width: 16,
+                                  height: 16,
+                                  borderRadius: '50%',
+                                  backgroundColor: selectedColor.code,
+                                  border: '1px solid #ddd'
+                                }}
+                              />
+                              <Typography variant='body2'>{selectedColor.name}</Typography>
+                            </Box>
+                          )
+                        }
+
+                        return 'Selecciona un color'
+                      }
+                    }}
                   >
                     <MenuItem value=''>Selecciona un color</MenuItem>
                     {colors?.map(color => (
@@ -612,41 +775,6 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
                   </Button>
                 </Grid>
               </Grid>
-
-              {variantForm.colorId === 'custom' && (
-                <Grid container spacing={2} sx={{ mt: 1 }}>
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <CustomTextField
-                      fullWidth
-                      size='small'
-                      label='Nombre del Color'
-                      value={variantForm.customColorName || ''}
-                      onChange={e =>
-                        setVariantForm(prev => ({
-                          ...prev,
-                          customColorName: e.target.value
-                        }))
-                      }
-                      placeholder='Ej: Verde Oliva'
-                    />
-                  </Grid>
-                  <Grid size={{ xs: 12, sm: 6 }}>
-                    <CustomTextField
-                      fullWidth
-                      size='small'
-                      label='Código de Color'
-                      value={variantForm.customColorCode || ''}
-                      onChange={e =>
-                        setVariantForm(prev => ({
-                          ...prev,
-                          customColorCode: e.target.value
-                        }))
-                      }
-                      placeholder='#FF5733'
-                    />
-                  </Grid>
-                </Grid>
-              )}
             </Box>
 
             <Box sx={{ mb: 3 }}>
@@ -671,6 +799,7 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
                       value={size.size}
                       onChange={e => handleSizeChange(index, 'size', e.target.value)}
                       placeholder='Talla (S, M, L)'
+                      disabled={!!size.id}
                     />
                   </Grid>
                   <Grid size={{ xs: 5 }}>
@@ -685,6 +814,7 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
 
                         handleSizeChange(index, 'quantity', value === '' ? 0 : parseInt(value) || 0)
                       }}
+                      disabled={!!size.id}
                       sx={{
                         '& input[type=number]': {
                           MozAppearance: 'textfield'
@@ -698,14 +828,16 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
                     />
                   </Grid>
                   <Grid size={{ xs: 2 }}>
-                    <IconButton
-                      size='small'
-                      color='error'
-                      onClick={() => handleRemoveSize(index)}
-                      disabled={variantForm.sizes.length === 1}
-                    >
-                      <i className='tabler-trash' />
-                    </IconButton>
+                    {!size.id && (
+                      <IconButton
+                        size='small'
+                        color='error'
+                        onClick={() => handleRemoveSize(index)}
+                        disabled={variantForm.sizes.filter(s => !s.id).length === 1}
+                      >
+                        <i className='tabler-trash' />
+                      </IconButton>
+                    )}
                   </Grid>
                 </Grid>
               ))}
@@ -762,9 +894,7 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
                     <TableRow>
                       <TableCell>Color</TableCell>
                       <TableCell>Tallas</TableCell>
-                      <TableCell>Stock</TableCell>
                       <TableCell>Imagen</TableCell>
-                      <TableCell></TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -785,38 +915,42 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
                                 width: 20,
                                 height: 20,
                                 borderRadius: '50%',
-                                backgroundColor: variant.colorCode,
+                                backgroundColor: variant.color?.code || variant.colorCode,
                                 border: '1px solid #ddd'
                               }}
                             />
-                            <Typography variant='caption'>{variant.colorName}</Typography>
+                            <Typography variant='caption'>{variant.color?.name || variant.colorName}</Typography>
                           </Box>
                         </TableCell>
                         <TableCell>
-                          <Typography variant='caption'>{variant.variants.map(s => s.size).join(', ')}</Typography>
-                        </TableCell>
-                        <TableCell>
                           <Typography variant='caption'>
-                            {variant.variants.reduce((sum, s) => sum + s.quantity, 0)}
+                            {variant.variants.map(s => (typeof s.size === 'object' ? s.size.name : s.size)).join(', ')}
                           </Typography>
                         </TableCell>
                         <TableCell>
                           <div className='flex items-center gap-1'>
-                            {variant.multimedia.slice(0, 3).map((url, idx) => (
-                              <Box
-                                key={idx}
-                                sx={{
-                                  width: 24,
-                                  height: 24,
-                                  borderRadius: 0.5,
-                                  overflow: 'hidden',
-                                  border: '1px solid',
-                                  borderColor: 'divider'
-                                }}
-                              >
-                                <img src={url} alt='' style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                              </Box>
-                            ))}
+                            {variant.multimedia
+                              .filter(url => {
+                                const ext = url.split('.').pop()?.toLowerCase() || ''
+
+                                return ['jpg', 'jpeg', 'png'].includes(ext)
+                              })
+                              .slice(0, 3)
+                              .map((url, idx) => (
+                                <Box
+                                  key={idx}
+                                  sx={{
+                                    width: 24,
+                                    height: 24,
+                                    borderRadius: 0.5,
+                                    overflow: 'hidden',
+                                    border: '1px solid',
+                                    borderColor: 'divider'
+                                  }}
+                                >
+                                  <img src={url} alt='' style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                </Box>
+                              ))}
                             {variant.multimedia.length > 3 && (
                               <Typography variant='caption' sx={{ fontSize: '10px', color: 'text.secondary' }}>
                                 +{variant.multimedia.length - 3}
@@ -828,19 +962,6 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
                               </Typography>
                             )}
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <IconButton
-                            size='small'
-                            color='error'
-                            onClick={e => {
-                              e.stopPropagation()
-                              setVariantToDelete(Number(variant.id!))
-                              setDeleteConfirmOpen(true)
-                            }}
-                          >
-                            <i className='tabler-trash' style={{ fontSize: '14px' }} />
-                          </IconButton>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -893,31 +1014,6 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
         </Box>
       </Grid>
 
-      {/* Modal de confirmación para eliminar */}
-      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
-        <DialogTitle>Confirmar Eliminación</DialogTitle>
-        <DialogContent>
-          <Typography>
-            ¿Estás seguro de que quieres eliminar esta variante? Esta acción no se puede deshacer.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteConfirmOpen(false)} color='secondary'>
-            Cancelar
-          </Button>
-          <Button
-            color='error'
-            variant='contained'
-            onClick={handleDeleteVariant}
-            disabled={deleteVariant.isPending}
-            startIcon={deleteVariant.isPending ? <CircularProgress size={16} /> : <i className='tabler-trash' />}
-          >
-            {deleteVariant.isPending ? 'Eliminando...' : 'Eliminar'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Modal de crear color personalizado */}
       <Dialog open={colorModalOpen} onClose={() => setColorModalOpen(false)} maxWidth='xs' fullWidth>
         <DialogTitle>Nuevo Color</DialogTitle>
         <DialogContent>

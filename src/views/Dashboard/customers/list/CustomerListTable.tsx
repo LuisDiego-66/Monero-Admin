@@ -107,30 +107,30 @@ const DebouncedInput = ({
     return () => clearTimeout(timeout)
   }, [value, onChange])
 
-  return <CustomTextField {...props} value={value} onChange={e => setValue(e.target.value)} />
+  return <CustomTextField {...props} value={value} onChange={(e: any) => setValue(e.target.value)} />
 }
 
 const columnHelper = createColumnHelper<Customer>()
 
 const CustomerListTable = () => {
-  const [page, setPage] = useState(0)
+  const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [search, setSearch] = useState('')
   const [customerTypeFilter, setCustomerTypeFilter] = useState<'all' | 'registered' | 'subscriber'>('all')
 
   const [rowSelection, setRowSelection] = useState({})
 
-  const {
-    data: customersData,
-    isLoading,
-    error,
-    isError
-  } = useCustomers({
-    limit: pageSize,
-    offset: page * pageSize,
-    search: search || undefined,
-    type: customerTypeFilter
-  })
+  const queryParams = useMemo(
+    () => ({
+      limit: pageSize,
+      page: page,
+      search: search || undefined,
+      type: customerTypeFilter
+    }),
+    [pageSize, page, search, customerTypeFilter]
+  )
+
+  const { data: customersData, isLoading, error, isError } = useCustomers(queryParams)
 
   const tableData = useMemo(() => {
     return customersData?.customers || []
@@ -172,7 +172,7 @@ const CustomerListTable = () => {
                 href={`/apps/ecommerce/customers/details/${row.original.id}`}
                 className='font-medium hover:text-primary'
               >
-                {row.original.name}
+                {row.original.name || 'Sin nombre'}
               </Typography>
               <Typography variant='body2'>{row.original.email}</Typography>
             </div>
@@ -232,19 +232,19 @@ const CustomerListTable = () => {
   const getAvatar = ({ name }: { name: string }) => {
     return (
       <CustomAvatar skin='light' size={34}>
-        {getInitials(name)}
+        {getInitials(name || 'Usuario')}
       </CustomAvatar>
     )
   }
 
   const handlePageChange = useCallback((_: unknown, newPage: number) => {
-    setPage(newPage)
-    setRowSelection({}) // Limpiar selección al cambiar página
+    setPage(newPage + 1)
+    setRowSelection({})
   }, [])
 
   const handlePageSizeChange = useCallback((newPageSize: number) => {
     setPageSize(newPageSize)
-    setPage(0)
+    setPage(1) // ✅
     setRowSelection({})
   }, [])
 
@@ -272,16 +272,20 @@ const CustomerListTable = () => {
     <div className='flex justify-between items-center flex-wrap pli-6 border-bs bs-auto plb-[12.5px] gap-2'>
       <Typography color='text.disabled'>
         {`Mostrando ${
-          totalRecords === 0 ? 0 : page * pageSize + 1
-        } a ${Math.min((page + 1) * pageSize, totalRecords)} de ${totalRecords} registros`}
+          totalRecords === 0 ? 0 : (page - 1) * pageSize + 1
+        } a ${Math.min(page * pageSize, totalRecords)} de ${totalRecords} registros`}
       </Typography>
       <TablePagination
         component='div'
         count={totalRecords}
-        page={page}
+        page={page - 1}
         onPageChange={handlePageChange}
         rowsPerPage={pageSize}
-        onRowsPerPageChange={event => handlePageSizeChange(parseInt(event.target.value, 10))}
+        onRowsPerPageChange={event => {
+          const target = event.target as HTMLInputElement
+
+          handlePageSizeChange(parseInt(target.value, 10))
+        }}
         rowsPerPageOptions={[10, 25, 50, 100]}
         labelRowsPerPage='Filas por página:'
         labelDisplayedRows={({ from, to, count }) => `${from}–${to} de ${count}`}
@@ -308,11 +312,16 @@ const CustomerListTable = () => {
           <DebouncedInput
             value={search}
             onChange={value => {
-              setSearch(String(value))
-              setPage(0) // Reset página al buscar
+              const newSearch = String(value)
+
+              if (newSearch !== search) {
+                setSearch(newSearch)
+                setPage(1)
+              }
             }}
-            placeholder='Buscar clientes...'
+            placeholder='Buscar Cliente'
             className='max-sm:is-full'
+            size='small'
           />
 
           <FormControl size='small' style={{ minWidth: 150 }}>
@@ -322,13 +331,13 @@ const CustomerListTable = () => {
               label='Filtrar por Tipo'
               onChange={e => {
                 setCustomerTypeFilter(e.target.value as any)
-                setPage(0)
+                setPage(1)
                 setRowSelection({})
               }}
             >
               <MenuItem value='all'>Todos los Clientes</MenuItem>
               <MenuItem value='registered'>Solo Registrados</MenuItem>
-              <MenuItem value='subscriber'>Solo Suscriptores</MenuItem>
+              <MenuItem value='subscribed'>Solo Suscriptores</MenuItem>
             </Select>
           </FormControl>
         </Box>

@@ -24,6 +24,24 @@ export const useVariantsByProduct = (productId: string | number | undefined) => 
   })
 }
 
+export const useVariantById = (variantId: number | null) => {
+  return useQuery({
+    queryKey: ['variant', variantId],
+    queryFn: () => variantService.getVariantById(variantId!),
+    enabled: !!variantId && variantId > 0,
+    staleTime: 0,
+    gcTime: 0
+  })
+}
+
+export const useColorById = (colorId: number | null) => {
+  return useQuery({
+    queryKey: ['color', colorId],
+    queryFn: () => variantService.getColorById(colorId!),
+    enabled: !!colorId && colorId > 0
+  })
+}
+
 export const useCreateVariant = () => {
   const queryClient = useQueryClient()
 

@@ -1,13 +1,34 @@
 import { apiClient } from '@/libs/axios'
-import type { Product, CreateProductDto, UpdateProductDto } from '@/types/api/product'
+import type {
+  Product,
+  CreateProductDto,
+  UpdateProductDto,
+  ProductsParams,
+  ProductsResponse,
+  ProductsApiResponse
+} from '@/types/api/product'
 
 class ProductServiceClass {
-  async getProducts(): Promise<Product[]> {
-    const response = await apiClient.get<Product[]>('/api/products')
+  async getProducts(params: ProductsParams = {}): Promise<ProductsResponse> {
+    const { limit = 10, page = 1, search } = params
 
-    console.log('Fetched products:', response.data)
+    const searchParams = new URLSearchParams({
+      limit: limit.toString(),
+      page: page.toString()
+    })
 
-    return response.data
+    if (search) {
+      searchParams.append('search', search)
+    }
+
+    const response = await apiClient.get<ProductsApiResponse>(`/api/products?${searchParams.toString()}`)
+
+    return {
+      products: response.data.data,
+      total: response.data.meta.total,
+      page: response.data.meta.page,
+      limit: response.data.meta.limit
+    }
   }
 
   async getProductById(id: number): Promise<Product> {

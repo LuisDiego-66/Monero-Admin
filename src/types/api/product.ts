@@ -44,5 +44,19 @@ export interface ProductsResponse {
 
 export interface ProductsParams {
   limit?: number
-  offset?: number
+  page?: number
+  search?: string
+}
+
+export interface ProductsApiResponse {
+  data: Product[]
+  meta: {
+    total: number
+    page: number
+    lastPage: number
+    limit: number
+    offset: number
+    hasNextPage: boolean
+    hasPreviousPage: boolean
+  }
 }

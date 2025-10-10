@@ -22,6 +22,17 @@ class VariantServiceClass {
       total: productColors.length
     }
   }
+  async getVariantById(variantId: number): Promise<Variant> {
+    const response = await apiClient.get(`/api/variants/${variantId}`)
+
+    return response.data
+  }
+  async getColorById(colorId: number): Promise<Color> {
+    const response = await apiClient.get<Color>(`/api/colors/${colorId}`)
+
+    return response.data
+  }
+
   async createVariant(data: CreateVariantDto): Promise<Variant> {
     const response = await apiClient.post<Variant>('/api/variants', data)
 

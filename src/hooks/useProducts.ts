@@ -3,12 +3,20 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { productService } from '@/services/productService'
-import type { CreateProductDto, UpdateProductDto } from '@/types/api/product'
+import type { CreateProductDto, UpdateProductDto, ProductsParams } from '@/types/api/product'
 
-export const useProducts = () => {
+export const useProducts = (params: ProductsParams = {}) => {
   return useQuery({
-    queryKey: ['products'],
-    queryFn: () => productService.getProducts(),
+    queryKey: [
+      'products',
+      {
+        page: params.page || 1,
+        limit: params.limit || 10,
+        search: params.search || ''
+      }
+    ],
+    queryFn: () => productService.getProducts(params),
+    placeholderData: previousData => previousData,
     staleTime: 5 * 60 * 1000,
     retry: 2
   })

@@ -3,11 +3,11 @@ import type { Customer, CustomersResponse, CustomersParams } from '@/types/api/c
 
 class CustomerServiceClass {
   async getCustomers(params: CustomersParams = {}): Promise<CustomersResponse> {
-    const { limit = 10, offset = 0, search, type } = params
+    const { limit = 10, page = 1, search, type } = params
 
     const searchParams = new URLSearchParams({
       limit: limit.toString(),
-      offset: offset.toString()
+      page: page.toString()
     })
 
     if (search) {
@@ -18,14 +18,23 @@ class CustomerServiceClass {
       searchParams.append('type', type)
     }
 
-    const response = await apiClient.get<Customer[]>(`/api/customers?${searchParams.toString()}`)
-
-    const customers = response.data
+    const response = await apiClient.get<{
+      data: Customer[]
+      meta: {
+        total: number
+        page: number
+        lastPage: number
+        limit: number
+        offset: number
+        hasNextPage: boolean
+        hasPreviousPage: boolean
+      }
+    }>(`/api/customers?${searchParams.toString()}`)
 
     return {
-      customers,
-      total: customers.length,
-      hasMore: customers.length === limit
+      customers: response.data.data,
+      total: response.data.meta.total,
+      hasMore: response.data.meta.hasNextPage
     }
   }
 

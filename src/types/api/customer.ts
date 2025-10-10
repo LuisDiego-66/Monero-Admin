@@ -18,9 +18,21 @@ export interface CustomersResponse {
 
 export interface CustomersParams {
   limit?: number
-  offset?: number
+  page?: number
   search?: string
   type?: 'all' | 'registered' | 'subscriber'
+}
+export interface CustomersApiResponse {
+  data: Customer[]
+  meta: {
+    total: number
+    page: number
+    lastPage: number
+    limit: number
+    offset: number
+    hasNextPage: boolean
+    hasPreviousPage: boolean
+  }
 }
 
 // export interface EmailForm {
