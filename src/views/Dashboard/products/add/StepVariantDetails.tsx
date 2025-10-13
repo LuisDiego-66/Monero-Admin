@@ -26,6 +26,8 @@ import CircularProgress from '@mui/material/CircularProgress'
 import { toast } from 'react-toastify'
 import { HexColorPicker } from 'react-colorful'
 
+import { z } from 'zod'
+
 import DirectionalIcon from '@components/DirectionalIcon'
 import CustomTextField from '@core/components/mui/TextField'
 import {
@@ -37,7 +39,9 @@ import {
   useVariantById,
   useColorById
 } from '@/hooks/useVariants'
-import type { VariantSize, Color, Variant } from '@/types/api/variants'
+import type { Color, Variant } from '@/types/api/variants'
+import { variantFormSchema, newColorSchema } from '@/schemas/variant.schema'
+import type { VariantFormData, MediaFile, NewColorForm, VariantSizeForm } from '@/schemas/variant.schema'
 
 type Props = {
   activeStep: number
@@ -50,31 +54,14 @@ type Props = {
   productCreated?: boolean
 }
 
-type MediaFile = {
-  id: string
-  file: File | null
-  url: string
-  type: 'image' | 'video' | 'document'
-  name: string
-  source: 'existing' | 'new'
-}
-
-type VariantForm = {
-  colorId: string
-  customColorName?: string
-  customColorCode?: string
-  sizes: VariantSize[]
-  mediaFiles: MediaFile[]
-}
-
 const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, productName, productCreated }: Props) => {
   const router = useRouter()
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const [variantForm, setVariantForm] = useState<VariantForm>({
+  const [variantForm, setVariantForm] = useState<VariantFormData>({
     colorId: '',
-    sizes: [{ size: '', quantity: 0 }],
+    sizes: [{ size: '', quantity: 1 }],
     mediaFiles: []
   })
 
@@ -82,10 +69,18 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
   const [editingVariantId, setEditingVariantId] = useState<number | null>(null)
   const [variantToLoadId, setVariantToLoadId] = useState<number | null>(null)
   const [colorToLoadId, setColorToLoadId] = useState<number | null>(null)
+  const [colorError, setColorError] = useState<string | null>(null)
+  const [filesError, setFilesError] = useState<string | null>(null)
+  const [sizesError, setSizesError] = useState<string | null>(null)
 
   const [isDragging, setIsDragging] = useState(false)
   const [colorModalOpen, setColorModalOpen] = useState(false)
-  const [newColor, setNewColor] = useState({ name: '', code: '#8B7355' })
+
+  const [newColor, setNewColor] = useState<NewColorForm>({
+    name: '',
+    code: '#8B7355'
+  })
+
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const { data: colors, isLoading: colorsLoading } = useColors()
@@ -102,8 +97,8 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
   const detectFileType = (url: string): 'image' | 'video' | 'document' => {
     const ext = url.split('.').pop()?.toLowerCase() || ''
 
-    if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext)) return 'image'
-    if (['mp4', 'webm', 'mov'].includes(ext)) return 'video'
+    if (['jpg', 'jpeg', 'png'].includes(ext)) return 'image'
+    if (['mp4'].includes(ext)) return 'video'
     if (ext === 'pdf') return 'document'
 
     return 'image'
@@ -124,11 +119,14 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
 
     setVariantForm({
       colorId: '',
-      sizes: [],
+      sizes: [{ size: '', quantity: 1 }],
       mediaFiles: []
     })
     setIsEditing(false)
     setEditingVariantId(null)
+    setColorError(null)
+    setFilesError(null)
+    setSizesError(null)
   }
 
   const isValidFileType = (file: File): boolean => {
@@ -139,6 +137,7 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
 
   const processFiles = (files: FileList) => {
     const newFiles: MediaFile[] = []
+    const invalidFiles: string[] = []
 
     Array.from(files).forEach(file => {
       if (isValidFileType(file)) {
@@ -153,15 +152,21 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
 
         newFiles.push(mediaFile)
       } else {
-        toast.error(`Tipo de archivo no válido: ${file.name}`)
+        invalidFiles.push(file.name)
       }
     })
+
+    if (invalidFiles.length > 0) {
+      setFilesError(`Formato no válido: ${invalidFiles.join(', ')}. Solo se permiten JPG, JPEG, PNG, MP4, PDF`)
+      toast.error(`${invalidFiles.length} archivo(s) con formato no válido`)
+    }
 
     if (newFiles.length > 0) {
       setVariantForm(prev => ({
         ...prev,
         mediaFiles: [...prev.mediaFiles, ...newFiles]
       }))
+      setFilesError(null)
       toast.success(`${newFiles.length} archivo(s) agregado(s)`)
     }
   }
@@ -221,17 +226,20 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
         mediaFiles: prev.mediaFiles.filter(f => f.id !== id)
       }
     })
+    setFilesError(null)
     toast.success('Archivo eliminado')
   }
 
   const handleAddSize = () => {
     setVariantForm(prev => ({
       ...prev,
-      sizes: [...prev.sizes, { size: '', quantity: 0 }]
+      sizes: [...prev.sizes, { size: '', quantity: 1 }]
     }))
+    setSizesError(null)
   }
 
-  const handleSizeChange = (index: number, field: keyof VariantSize, value: any) => {
+  const handleSizeChange = (index: number, field: keyof VariantSizeForm, value: any) => {
+    setSizesError(null)
     setVariantForm(prev => ({
       ...prev,
       sizes: prev.sizes.map((size, i) => {
@@ -268,35 +276,53 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
   }
 
   const handleSaveVariant = async () => {
-    const selectedColor = getSelectedColor()
-
-    if (!selectedColor || !selectedColor.name) {
-      toast.error('Selecciona un color')
-
-      return
-    }
-
-    if (variantForm.sizes.some(s => !s.size || (s.quantity ?? 0) < 0)) {
-      toast.error('Completa todas las tallas y stocks')
-
-      return
-    }
-
-    if (variantForm.mediaFiles.length === 0) {
-      toast.error('Agrega al menos una imagen')
-
-      return
-    }
-
     try {
-      const newMultimediaFiles = variantForm.mediaFiles.filter(f => f.source === 'new' && f.type !== 'document')
-      const newPdfFiles = variantForm.mediaFiles.filter(f => f.source === 'new' && f.type === 'document')
+      setColorError(null)
+      setFilesError(null)
+      setSizesError(null)
 
-      const existingMultimediaUrls = variantForm.mediaFiles
+      const validation = variantFormSchema.safeParse(variantForm)
+
+      if (!validation.success) {
+        validation.error.issues.forEach(issue => {
+          const field = issue.path[0]
+
+          if (field === 'colorId' || field === 'customColorName' || field === 'customColorCode') {
+            setColorError(issue.message)
+          }
+
+          if (field === 'mediaFiles') {
+            setFilesError(issue.message)
+          }
+
+          if (field === 'sizes') {
+            setSizesError(issue.message)
+          }
+        })
+
+        toast.error(validation.error.issues[0].message)
+
+        return
+      }
+
+      const validatedData = validation.data
+
+      const selectedColor = getSelectedColor()
+
+      if (!selectedColor || !selectedColor.name) {
+        toast.error('Selecciona un color')
+
+        return
+      }
+
+      const newMultimediaFiles = validatedData.mediaFiles.filter(f => f.source === 'new' && f.type !== 'document')
+      const newPdfFiles = validatedData.mediaFiles.filter(f => f.source === 'new' && f.type === 'document')
+
+      const existingMultimediaUrls = validatedData.mediaFiles
         .filter(f => f.source === 'existing' && f.type !== 'document')
         .map(f => f.url)
 
-      const existingPdfUrls = variantForm.mediaFiles
+      const existingPdfUrls = validatedData.mediaFiles
         .filter(f => f.source === 'existing' && f.type === 'document')
         .map(f => f.url)
 
@@ -323,8 +349,8 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
         url => typeof url === 'string' && url.startsWith('http')
       )
 
-      const normalizedVariants = variantForm.sizes.map(s => ({
-        size: typeof s.size === 'object' ? s.size.name : s.size,
+      const normalizedVariants = validatedData.sizes.map(s => ({
+        size: typeof s.size === 'object' ? (s.size as any).name : s.size,
         quantity: s.quantity || 0
       }))
 
@@ -336,9 +362,6 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
         colorCode: selectedColor.code,
         productId: parseInt(productId!)
       }
-
-      /*   console.log(' Datos a enviar:', variantData)
-      console.log(' PDFs:', finalPdfUrls) */
 
       if (isEditing && editingVariantId) {
         await updateVariant.mutateAsync({
@@ -352,11 +375,26 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
       }
 
       handleClearForm()
-    } catch (error: any) {
-      if (error?.response?.status === 409) {
-        toast.error('Ya existe una variante con este color para este producto')
-      } else if (error?.response?.status === 400) {
-        const message = error?.response?.data?.message
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        toast.error(error.issues[0]?.message || 'Error de validación')
+        console.error('Errores de validación:', error.format())
+
+        return
+      }
+
+      const apiError = error as any
+
+      if (apiError?.response?.status === 409) {
+        const selectedColor = getSelectedColor()
+        const errorMsg = `Ya existe una variante con el color "${selectedColor?.name}". Por favor, selecciona otro color.`
+
+        setColorError(errorMsg)
+        toast.error(errorMsg)
+
+        return
+      } else if (apiError?.response?.status === 400) {
+        const message = apiError?.response?.data?.message
 
         if (Array.isArray(message)) {
           toast.error(`Error: ${message.join(', ')}`)
@@ -365,7 +403,7 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
         } else {
           toast.error('Datos inválidos. Verifica todos los campos.')
         }
-      } else if (error?.message?.includes('multimedia')) {
+      } else if (apiError?.message?.includes('multimedia')) {
         toast.error('Error al procesar los archivos. Inténtalo de nuevo.')
       } else {
         toast.error(isEditing ? 'Error al actualizar la variante' : 'Error al guardar la variante')
@@ -411,6 +449,7 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
       })
     }
   }, [])
+
   useEffect(() => {
     if (variantToLoad && variantToLoadId) {
       const multimediaFiles: MediaFile[] = variantToLoad.multimedia.map((url, idx) => ({
@@ -431,11 +470,23 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
         source: 'existing' as const
       }))
 
-      const normalizedSizes = (variantToLoad.variants || []).map(v => ({
-        id: v.id,
-        size: typeof v.size === 'object' ? v.size.name : v.size,
-        quantity: v.availableStock || v.quantity || 0
-      }))
+      const normalizedSizes = (variantToLoad.variants || []).map(v => {
+        let sizeValue: string
+
+        if (v.size && typeof v.size === 'object' && 'name' in v.size) {
+          sizeValue = (v.size as { name: string }).name
+        } else if (typeof v.size === 'string') {
+          sizeValue = v.size
+        } else {
+          sizeValue = String(v.size || '')
+        }
+
+        return {
+          id: v.id,
+          size: sizeValue,
+          quantity: v.availableStock || v.quantity || 0
+        }
+      })
 
       setVariantForm({
         colorId: '',
@@ -528,17 +579,27 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
           />
           <CardContent>
             <Box sx={{ mb: 3 }}>
-              <Typography variant='subtitle2' gutterBottom>
+              <Typography
+                variant='subtitle2'
+                gutterBottom
+                sx={{
+                  color: filesError ? 'error.main' : 'text.primary'
+                }}
+              >
                 Archivos Multimedia
               </Typography>
               <Box
                 sx={{
                   border: '2px dashed',
-                  borderColor: isDragging ? 'primary.main' : 'divider',
+                  borderColor: filesError ? 'error.main' : isDragging ? 'primary.main' : 'divider',
                   borderRadius: 1,
                   p: 3,
                   textAlign: 'center',
-                  backgroundColor: isDragging ? 'action.hover' : 'background.paper',
+                  backgroundColor: filesError
+                    ? 'rgba(211, 47, 47, 0.04)'
+                    : isDragging
+                      ? 'action.hover'
+                      : 'background.paper',
                   cursor: 'pointer',
                   minHeight: '120px',
                   display: 'flex',
@@ -553,13 +614,16 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
               >
                 <i
                   className='tabler-cloud-upload'
-                  style={{ fontSize: '2rem', color: 'var(--mui-palette-primary-main)' }}
+                  style={{
+                    fontSize: '2rem',
+                    color: filesError ? 'var(--mui-palette-error-main)' : 'var(--mui-palette-primary-main)'
+                  }}
                 />
-                <Typography variant='body2' color='text.secondary' sx={{ mt: 1 }}>
+                <Typography variant='body2' color={filesError ? 'error' : 'text.secondary'} sx={{ mt: 1 }}>
                   {isDragging ? 'Suelta aquí los archivos' : 'Arrastra imágenes/videos o haz clic para seleccionar'}
                 </Typography>
-                <Typography variant='caption' color='text.secondary'>
-                  Formatos: JPG, PNG, MP4, PDF
+                <Typography variant='caption' color={filesError ? 'error' : 'text.secondary'}>
+                  Formatos: JPG, JPEG, PNG, MP4, PDF
                 </Typography>
               </Box>
               <input
@@ -570,6 +634,17 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
                 style={{ display: 'none' }}
                 onChange={handleFileInputChange}
               />
+              {filesError && (
+                <Typography
+                  sx={{
+                    display: 'block',
+                    mt: 1,
+                    color: 'error.main'
+                  }}
+                >
+                  {filesError}
+                </Typography>
+              )}
 
               {variantForm.mediaFiles.length > 0 && (
                 <Box sx={{ mt: 2 }}>
@@ -692,7 +767,12 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
                     size='small'
                     label='Seleccionar Color'
                     value={variantForm.colorId}
-                    onChange={e => setVariantForm(prev => ({ ...prev, colorId: e.target.value }))}
+                    onChange={e => {
+                      setVariantForm(prev => ({ ...prev, colorId: e.target.value }))
+                      setColorError(null)
+                    }}
+                    error={!!colorError}
+                    helperText={colorError || ''}
                     disabled={colorsLoading}
                     SelectProps={{
                       renderValue: selected => {
@@ -779,7 +859,14 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
 
             <Box sx={{ mb: 3 }}>
               <Box display='flex' justifyContent='space-between' alignItems='center' sx={{ mb: 2 }}>
-                <Typography variant='subtitle2'>Tallas y Stock</Typography>
+                <Typography
+                  variant='subtitle2'
+                  sx={{
+                    color: sizesError ? 'var(--mui-palette-error-main)' : 'inherit'
+                  }}
+                >
+                  Tallas y Stock
+                </Typography>
                 <Button
                   variant='outlined'
                   size='small'
@@ -798,8 +885,9 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
                       size='small'
                       value={size.size}
                       onChange={e => handleSizeChange(index, 'size', e.target.value)}
-                      placeholder='Talla (S, M, L)'
+                      placeholder='Talla (S, M, L ...)'
                       disabled={!!size.id}
+                      error={!!sizesError}
                     />
                   </Grid>
                   <Grid size={{ xs: 5 }}>
@@ -815,6 +903,7 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
                         handleSizeChange(index, 'quantity', value === '' ? 0 : parseInt(value) || 0)
                       }}
                       disabled={!!size.id}
+                      error={!!sizesError}
                       sx={{
                         '& input[type=number]': {
                           MozAppearance: 'textfield'
@@ -841,7 +930,24 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
                   </Grid>
                 </Grid>
               ))}
+              {sizesError && (
+                <Typography
+                  variant='caption'
+                  sx={{
+                    display: 'block',
+                    mt: 1,
+                    color: 'var(--mui-palette-error-main)' // ← Asegura que el error sea rojo
+                  }}
+                >
+                  {sizesError}
+                </Typography>
+              )}
             </Box>
+            {/* {formError && (
+              <Alert severity='error' sx={{ mb: 2 }} onClose={() => setFormError(null)}>
+                {formError}
+              </Alert>
+            )} */}
 
             <Button
               fullWidth
@@ -924,7 +1030,9 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
                         </TableCell>
                         <TableCell>
                           <Typography variant='caption'>
-                            {variant.variants.map(s => (typeof s.size === 'object' ? s.size.name : s.size)).join(', ')}
+                            {variant.variants
+                              .map(s => (typeof s.size === 'object' ? (s.size as any).name : s.size))
+                              .join(', ')}
                           </Typography>
                         </TableCell>
                         <TableCell>
@@ -1061,16 +1169,22 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
           </Button>
           <Button
             onClick={() => {
-              if (newColor.name) {
+              try {
+                const validatedColor = newColorSchema.parse(newColor)
+
                 setVariantForm(prev => ({
                   ...prev,
                   colorId: 'custom',
-                  customColorName: newColor.name,
-                  customColorCode: newColor.code
+                  customColorName: validatedColor.name,
+                  customColorCode: validatedColor.code
                 }))
                 setNewColor({ name: '', code: '#8B7355' })
                 setColorModalOpen(false)
                 toast.success('Color configurado')
+              } catch (error) {
+                if (error instanceof z.ZodError) {
+                  toast.error(error.issues[0]?.message || 'Error de validación')
+                }
               }
             }}
             variant='contained'
