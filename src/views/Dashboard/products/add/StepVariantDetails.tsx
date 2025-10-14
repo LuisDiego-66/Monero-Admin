@@ -88,6 +88,7 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
   const uploadMultimedia = useUploadMultimedia()
   const { data: variantToLoad, isLoading: variantLoading } = useVariantById(variantToLoadId)
   const { data: colorToLoad } = useColorById(colorToLoadId)
+  const [originalColorId, setOriginalColorId] = useState<number | null>(null)
 
   const createVariant = useCreateVariant()
   const updateVariant = useUpdateVariant()
@@ -124,6 +125,7 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
     })
     setIsEditing(false)
     setEditingVariantId(null)
+    setOriginalColorId(null)
     setColorError(null)
     setFilesError(null)
     setSizesError(null)
@@ -349,28 +351,46 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
         url => typeof url === 'string' && url.startsWith('http')
       )
 
-      const normalizedVariants = validatedData.sizes.map(s => ({
-        size: typeof s.size === 'object' ? (s.size as any).name : s.size,
-        quantity: s.quantity || 0
-      }))
-
-      const variantData = {
-        multimedia: finalMultimediaUrls,
-        pdfs: finalPdfUrls,
-        variants: normalizedVariants,
-        colorName: selectedColor.name,
-        colorCode: selectedColor.code,
-        productId: parseInt(productId!)
-      }
+      // ✅ MODIFICACIÓN PRINCIPAL: Filtrar solo tallas nuevas en modo edición
+      const normalizedVariants = isEditing
+        ? validatedData.sizes
+            .filter(s => !s.id) // Solo las nuevas (sin id)
+            .map(s => ({
+              size: typeof s.size === 'object' ? (s.size as any).name : s.size,
+              quantity: s.quantity || 0
+            }))
+        : validatedData.sizes.map(s => ({
+            size: typeof s.size === 'object' ? (s.size as any).name : s.size,
+            quantity: s.quantity || 0
+          }))
 
       if (isEditing && editingVariantId) {
+        // ✅ Para UPDATE: Siempre enviar colorName, colorCode, multimedia, pdfs y variants
+        const updateData = {
+          multimedia: finalMultimediaUrls,
+          pdfs: finalPdfUrls,
+          variants: normalizedVariants, // Vacío [] si no hay nuevas, o con las nuevas
+          colorName: selectedColor.name,
+          colorCode: selectedColor.code
+        }
+
         await updateVariant.mutateAsync({
           id: editingVariantId,
-          data: variantData
+          data: updateData
         })
         toast.success('Variante actualizada exitosamente')
       } else {
-        await createVariant.mutateAsync(variantData)
+        // ✅ Para CREATE: Enviar todo incluyendo productId
+        const createData = {
+          multimedia: finalMultimediaUrls,
+          pdfs: finalPdfUrls,
+          variants: normalizedVariants,
+          colorName: selectedColor.name,
+          colorCode: selectedColor.code,
+          productId: parseInt(productId!)
+        }
+
+        await createVariant.mutateAsync(createData)
         toast.success('Variante guardada exitosamente')
       }
 
@@ -498,13 +518,13 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
       setEditingVariantId(variantToLoadId)
 
       if (variantToLoad.color?.id) {
+        setOriginalColorId(variantToLoad.color.id)
         setColorToLoadId(variantToLoad.color.id)
       }
 
       setVariantToLoadId(null)
     }
   }, [variantToLoad, variantToLoadId])
-
   useEffect(() => {
     if (colorToLoad && colorToLoadId) {
       const colorExistsInList = colors?.some(c => c.id === colorToLoadId)

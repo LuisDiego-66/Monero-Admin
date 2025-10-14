@@ -1,46 +1,50 @@
 'use client'
 
-// React Imports
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 
-// MUI Imports
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
+import { DatePicker } from '@mui/x-date-pickers/DatePicker'
+import type dayjs from 'dayjs'
+import 'dayjs/locale/es'
+
 import Card from '@mui/material/Card'
-import Button from '@mui/material/Button'
+import CardHeader from '@mui/material/CardHeader'
 import Chip from '@mui/material/Chip'
-import MenuItem from '@mui/material/MenuItem'
-import TablePagination from '@mui/material/TablePagination'
 import Typography from '@mui/material/Typography'
+import Alert from '@mui/material/Alert'
+import Box from '@mui/material/Box'
+import Skeleton from '@mui/material/Skeleton'
 import Dialog from '@mui/material/Dialog'
 import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
 import DialogActions from '@mui/material/DialogActions'
-import Box from '@mui/material/Box'
-import Checkbox from '@mui/material/Checkbox'
+import Button from '@mui/material/Button'
+import MenuItem from '@mui/material/MenuItem'
+import TablePagination from '@mui/material/TablePagination'
+import Switch from '@mui/material/Switch'
+import FormControlLabel from '@mui/material/FormControlLabel'
 import type { TextFieldProps } from '@mui/material/TextField'
-
-// Third-party Imports
+import { useTheme } from '@mui/material/styles'
 import classnames from 'classnames'
 import { rankItem } from '@tanstack/match-sorter-utils'
+import Avatar from '@mui/material/Avatar'
+import AvatarGroup from '@mui/material/AvatarGroup'
+import Tooltip from '@mui/material/Tooltip'
 import {
-  createColumnHelper,
   flexRender,
   getCoreRowModel,
   useReactTable,
-  getFilteredRowModel,
   getFacetedRowModel,
   getFacetedUniqueValues,
   getFacetedMinMaxValues,
-  getPaginationRowModel,
   getSortedRowModel
 } from '@tanstack/react-table'
 import type { ColumnDef, FilterFn } from '@tanstack/react-table'
 import type { RankingInfo } from '@tanstack/match-sorter-utils'
 
-// Component Imports
 import CustomTextField from '@core/components/mui/TextField'
-import TablePaginationComponent from '@components/TablePaginationComponent'
-
-// Style Imports
+import { useProducts } from '@/hooks/useProducts'
 import tableStyles from '@core/styles/table.module.css'
 
 declare module '@tanstack/table-core' {
@@ -50,15 +54,6 @@ declare module '@tanstack/table-core' {
   interface FilterMeta {
     itemRank: RankingInfo
   }
-}
-
-type ProductType = {
-  id: number
-  tienda: 'HOMBRES' | 'MUJERES'
-  nombre: string
-  fotos: string[]
-  costo: number
-  descuento: number
 }
 
 const fuzzyFilter: FilterFn<any> = (row, columnId, value, addMeta) => {
@@ -96,401 +91,453 @@ const DebouncedInput = ({
   return <CustomTextField {...props} value={value} onChange={e => setValue(e.target.value)} />
 }
 
-const productsData: ProductType[] = [
-  {
-    id: 1,
-    tienda: 'HOMBRES',
-    nombre: 'Pantalón Cargo Militar',
-    fotos: ['👖', '🩲', '👔', '🧥', '👕', '🩱'],
-    costo: 270.0,
-    descuento: 0
-  },
-  {
-    id: 2,
-    tienda: 'MUJERES',
-    nombre: 'Blusa Elegante',
-    fotos: ['👚', '👗', '🥻', '👘'],
-    costo: 180.0,
-    descuento: 10
-  },
-  {
-    id: 3,
-    tienda: 'HOMBRES',
-    nombre: 'Camisa Polo Clásica',
-    fotos: ['👕', '🩱', '👔', '🧥', '👖'],
-    costo: 120.0,
-    descuento: 15
-  },
-  {
-    id: 4,
-    tienda: 'MUJERES',
-    nombre: 'Vestido Casual',
-    fotos: ['👗', '👚', '🥻', '👘', '👠'],
-    costo: 350.0,
-    descuento: 20
-  },
-  {
-    id: 5,
-    tienda: 'HOMBRES',
-    nombre: 'Zapatos Deportivos',
-    fotos: ['👟', '👞', '🥿', '👠'],
-    costo: 450.0,
-    descuento: 5
-  }
-]
+const DiscountsListTable = () => {
+  const theme = useTheme()
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [search, setSearch] = useState('')
 
-const DiscountModal = ({
-  open,
-  onClose,
-  selectedProducts,
-  allProducts,
-  onUpdateDiscounts
-}: {
-  open: boolean
-  onClose: () => void
-  selectedProducts: number[]
-  allProducts: ProductType[]
-  onUpdateDiscounts: (productIds: number[], newDiscount: number) => void
-}) => {
-  const [newDiscount, setNewDiscount] = useState(0)
+  const [addDialogOpen, setAddDialogOpen] = useState(false)
+  const [discountType, setDiscountType] = useState<'permanent' | 'temporary'>('permanent')
 
-  const selectedProductsData = allProducts.filter(product => selectedProducts.includes(product.id))
+  const [formData, setFormData] = useState({
+    description: '',
+    value: 0,
+    startDate: null as dayjs.Dayjs | null,
+    endDate: null as dayjs.Dayjs | null
+  })
 
-  const handleApplyDiscount = () => {
-    onUpdateDiscounts(selectedProducts, newDiscount)
-    onClose()
-    setNewDiscount(0)
-  }
-
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth='sm' fullWidth>
-      <DialogTitle>
-        <Typography variant='h5'>Cambiar Descuento</Typography>
-      </DialogTitle>
-
-      <DialogContent>
-        <Box className='space-y-4'>
-          <Typography variant='body2' color='textSecondary'>
-            Productos seleccionados: {selectedProducts.length}
-          </Typography>
-
-          <Box className='space-y-2'>
-            {selectedProductsData.map(product => (
-              <Box
-                key={product.id}
-                className='flex items-center justify-between p-3 rounded-lg border border-divider bg-background'
-              >
-                <Box className='flex items-center gap-3'>
-                  {/* Mostrar múltiples imágenes en el modal */}
-                  <Box className='flex gap-1'>
-                    {product.fotos.slice(0, 3).map((foto: string, index: number) => (
-                      <Box
-                        key={index}
-                        className='w-8 h-8 bg-actionHover rounded flex items-center justify-center text-xs'
-                      >
-                        {foto}
-                      </Box>
-                    ))}
-                    {product.fotos.length > 3 && (
-                      <Box className='w-8 h-8 bg-actionHover rounded flex items-center justify-center text-xs text-textSecondary'>
-                        +{product.fotos.length - 3}
-                      </Box>
-                    )}
-                  </Box>
-                  <Typography variant='body2' className='text-textPrimary'>
-                    {product.nombre}
-                  </Typography>
-                </Box>
-                <Typography variant='caption' className='text-textSecondary'>
-                  Descuento actual: {product.descuento}%
-                </Typography>
-              </Box>
-            ))}
-          </Box>
-
-          <CustomTextField
-            fullWidth
-            type='number'
-            label='Nuevo descuento (%)'
-            value={newDiscount}
-            onChange={e => setNewDiscount(Number(e.target.value))}
-            inputProps={{ min: 0, max: 100 }}
-            variant='outlined'
-          />
-        </Box>
-      </DialogContent>
-
-      <DialogActions>
-        <Button onClick={onClose} variant='outlined'>
-          Cancelar
-        </Button>
-        <Button
-          onClick={handleApplyDiscount}
-          variant='contained'
-          color='primary'
-          disabled={selectedProducts.length === 0}
-        >
-          Aplicar Descuento
-        </Button>
-      </DialogActions>
-    </Dialog>
+  const queryParams = useMemo(
+    () => ({
+      limit: pageSize,
+      page: page,
+      search: search
+    }),
+    [pageSize, page, search]
   )
-}
 
-const columnHelper = createColumnHelper<ProductType>()
+  const { data: productsData, isLoading, error, isFetching } = useProducts(queryParams)
 
-const ProductsTable = () => {
-  // States
-  const [data, setData] = useState<ProductType[]>(productsData)
-  const [globalFilter, setGlobalFilter] = useState('')
-  const [selectedProducts, setSelectedProducts] = useState<number[]>([])
-  const [discountModalOpen, setDiscountModalOpen] = useState(false)
+  const allProducts = useMemo(() => {
+    return productsData?.products || []
+  }, [productsData])
 
-  const handleSelectProduct = (productId: number) => {
-    setSelectedProducts(prev => (prev.includes(productId) ? prev.filter(id => id !== productId) : [...prev, productId]))
-  }
+  const totalRecords = useMemo(() => {
+    return productsData?.total || 0
+  }, [productsData])
 
-  const handleSelectAll = () => {
-    if (selectedProducts.length === data.length) {
-      setSelectedProducts([])
-    } else {
-      setSelectedProducts(data.map(product => product.id))
+  const handleOpenAddDialog = useCallback(() => {
+    setFormData({
+      description: '',
+      value: 0,
+      startDate: null,
+      endDate: null
+    })
+    setDiscountType('permanent')
+    setAddDialogOpen(true)
+  }, [])
+
+  const handleCloseAddDialog = useCallback(() => {
+    setAddDialogOpen(false)
+  }, [])
+
+  const handleSubmitDiscount = useCallback(async () => {
+    try {
+      const payload: any = {
+        description: formData.description,
+        isActive: true,
+        value: formData.value
+      }
+
+      if (discountType === 'temporary') {
+        payload.startDate = formData.startDate?.toISOString()
+        payload.endDate = formData.endDate?.toISOString()
+      }
+
+      console.log('Crear descuento:', payload)
+
+      handleCloseAddDialog()
+    } catch (error) {
+      console.error('Error al crear descuento:', error)
     }
-  }
+  }, [formData, discountType, handleCloseAddDialog])
 
-  const handleUpdateDiscounts = (productIds: number[], newDiscount: number) => {
-    setData(prev =>
-      prev.map(product => (productIds.includes(product.id) ? { ...product, descuento: newDiscount } : product))
-    )
-    setSelectedProducts([])
-  }
-
-  const columns = useMemo<ColumnDef<ProductType, any>[]>(
+  const columns = useMemo<ColumnDef<any, any>[]>(
     () => [
-      columnHelper.display({
-        id: 'select',
-        header: () => (
-          <Checkbox
-            checked={selectedProducts.length === data.length && data.length > 0}
-            indeterminate={selectedProducts.length > 0 && selectedProducts.length < data.length}
-            onChange={handleSelectAll}
-          />
-        ),
-        cell: ({ row }) => (
-          <Checkbox
-            checked={selectedProducts.includes(row.original.id)}
-            onChange={() => handleSelectProduct(row.original.id)}
-          />
-        )
-      }),
-      columnHelper.accessor('id', {
+      {
+        accessorKey: 'id',
         header: 'ID',
-        cell: ({ row }) => (
+        cell: ({ row }: any) => (
           <Typography className='font-medium' color='text.primary'>
             {row.original.id}
           </Typography>
         )
-      }),
-      columnHelper.accessor('tienda', {
+      },
+      {
+        accessorKey: 'gender',
         header: 'Tienda',
-        cell: ({ row }) => (
+        cell: ({ row }: any) => {
+          const gender = row.original.subcategory.category.gender
+          const isWomen = gender === 'female'
+
+          return (
+            <Chip
+              label={isWomen ? 'MUJERES' : 'HOMBRES'}
+              variant='tonal'
+              color={isWomen ? 'error' : 'primary'}
+              size='small'
+            />
+          )
+        }
+      },
+      {
+        accessorKey: 'name',
+        header: 'Nombre',
+        cell: ({ row }: any) => (
+          <Typography className='font-medium' color='text.primary'>
+            {row.original.name}
+          </Typography>
+        ),
+        filterFn: 'fuzzy'
+      },
+      {
+        accessorKey: 'price',
+        header: 'Precio',
+        cell: ({ row }: any) => (
+          <Typography className='font-medium' color='text.primary'>
+            ${row.original.price}
+          </Typography>
+        )
+      },
+      {
+        accessorKey: 'description',
+        header: 'Descripción',
+        cell: ({ row }: any) => (
+          <Box sx={{ maxWidth: 300 }}>
+            <Typography variant='body2' className='truncate' title={row.original.description} color='text.secondary'>
+              {row.original.description}
+            </Typography>
+          </Box>
+        ),
+        filterFn: 'fuzzy'
+      },
+      {
+        accessorKey: 'images',
+        header: 'Imágenes',
+        cell: ({ row }: any) => {
+          const productColors = row.original.productColors || []
+
+          const allImages = productColors
+            .flatMap((color: any) => color.multimedia || [])
+            .filter((url: string) => url.match(/\.(jpeg|jpg|png|gif|webp)$/i))
+
+          const displayImages = allImages.slice(0, 4)
+          const remainingCount = allImages.length - 4
+
+          if (allImages.length === 0) {
+            return (
+              <Typography variant='body2' color='text.secondary'>
+                Sin imágenes
+              </Typography>
+            )
+          }
+
+          return (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <AvatarGroup max={4} sx={{ '& .MuiAvatar-root': { width: 32, height: 32 } }}>
+                {displayImages.map((url: string, index: number) => (
+                  <Tooltip key={index} title={`Imagen ${index + 1}`}>
+                    <Avatar src={url} alt={`Producto ${index + 1}`} variant='rounded' sx={{ cursor: 'pointer' }} />
+                  </Tooltip>
+                ))}
+              </AvatarGroup>
+              {remainingCount > 0 && (
+                <Chip label={`+${remainingCount}`} size='small' color='default' variant='outlined' />
+              )}
+            </Box>
+          )
+        }
+      },
+      {
+        accessorKey: 'discount',
+        header: 'Descuento',
+        cell: ({ row }: any) => {
+          const discount = row.original.discount
+
+          if (!discount) {
+            return <Chip label='Sin descuento' size='small' variant='outlined' color='default' />
+          }
+
+          return (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+              <Chip label={`${discount.value}% OFF`} size='small' color='success' variant='tonal' />
+              {discount.description && (
+                <Typography variant='caption' color='text.secondary' sx={{ fontSize: '0.7rem' }}>
+                  {discount.description}
+                </Typography>
+              )}
+            </Box>
+          )
+        }
+      },
+
+      {
+        accessorKey: 'enabled',
+        header: 'Estado',
+        cell: ({ row }: any) => (
           <Chip
-            label={row.original.tienda}
-            variant='tonal'
-            color={row.original.tienda === 'HOMBRES' ? 'primary' : 'error'}
+            label={row.original.enabled ? 'Activo' : 'Inactivo'}
+            color={row.original.enabled ? 'success' : 'error'}
             size='small'
           />
-        )
-      }),
-      columnHelper.accessor('nombre', {
-        header: 'Nombre del Producto',
-        cell: ({ row }) => (
-          <Typography className='font-medium' color='text.primary'>
-            {row.original.nombre}
-          </Typography>
-        )
-      }),
-      columnHelper.accessor('fotos', {
-        header: 'Fotos',
-        cell: ({ row }) => (
-          <Box className='flex gap-1'>
-            {row.original.fotos.slice(0, 4).map((foto: string, index: number) => (
-              <Box
-                key={index}
-                className='w-10 h-10 bg-actionHover rounded-lg flex items-center justify-center border text-sm'
-              >
-                {foto}
-              </Box>
-            ))}
-            {row.original.fotos.length > 4 && (
-              <Box className='w-10 h-10 bg-actionSelected rounded-lg flex items-center justify-center border text-xs text-textSecondary'>
-                +{row.original.fotos.length - 4}
-              </Box>
-            )}
-          </Box>
-        )
-      }),
-      columnHelper.accessor('costo', {
-        header: 'Costo',
-        cell: ({ row }) => (
-          <Typography className='font-medium' color='text.primary'>
-            Bs. {row.original.costo.toFixed(2)}
-          </Typography>
-        )
-      }),
-      columnHelper.accessor('descuento', {
-        header: 'Descuento',
-        cell: ({ row }) => (
-          <Box className='flex items-center gap-2'>
-            <Typography className='font-medium' color='text.primary'>
-              {row.original.descuento}%
-            </Typography>
-            {row.original.descuento > 0 && (
-              <Chip label={`-${row.original.descuento}%`} variant='tonal' color='success' size='small' />
-            )}
-          </Box>
-        )
-      })
+        ),
+        filterFn: (row: any, columnId: string, filterValue: any) => {
+          if (filterValue === undefined || filterValue === '') return true
+
+          return row.getValue(columnId) === filterValue
+        }
+      }
     ],
-    [selectedProducts, data]
+    []
   )
 
   const table = useReactTable({
-    data: data,
+    data: allProducts,
     columns,
     filterFns: {
       fuzzy: fuzzyFilter
     },
-    state: {
-      globalFilter
-    },
-    initialState: {
-      pagination: {
-        pageSize: 10
-      }
-    },
+    state: {},
     enableRowSelection: false,
-    globalFilterFn: fuzzyFilter,
+    enableSorting: true,
     getCoreRowModel: getCoreRowModel(),
-    onGlobalFilterChange: setGlobalFilter,
-    getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
     getFacetedMinMaxValues: getFacetedMinMaxValues()
   })
 
-  return (
-    <>
+  const renderSkeleton = () => (
+    <tbody>
+      {Array.from({ length: pageSize }).map((_, index) => (
+        <tr key={index}>
+          {columns.map((_, colIndex) => (
+            <td key={colIndex} className='p-4'>
+              <Skeleton variant='text' width='100%' height={20} />
+            </td>
+          ))}
+        </tr>
+      ))}
+    </tbody>
+  )
+
+  if (error) {
+    return (
       <Card>
-        <div className='flex flex-wrap justify-between gap-4 p-6'>
-          <DebouncedInput
-            value={globalFilter ?? ''}
-            onChange={value => setGlobalFilter(String(value))}
-            placeholder='Buscar producto...'
-            className='max-sm:is-full'
-          />
+        <Box sx={{ p: 4 }}>
+          <Alert severity='error'>
+            Error al cargar los productos: {error instanceof Error ? error.message : 'Error desconocido'}
+          </Alert>
+        </Box>
+      </Card>
+    )
+  }
 
-          <div className='flex flex-wrap items-center max-sm:flex-col gap-4 max-sm:is-full is-auto'>
-            <Button
-              variant='contained'
-              color='primary'
-              onClick={() => setDiscountModalOpen(true)}
-              disabled={selectedProducts.length === 0}
-              startIcon={<i className='tabler-percentage' />}
-            >
-              Cambiar Descuento ({selectedProducts.length})
-            </Button>
+  return (
+    <Card>
+      <CardHeader title='Productos' />
 
-            <CustomTextField
-              select
-              value={table.getState().pagination.pageSize}
-              onChange={e => table.setPageSize(Number(e.target.value))}
-              className='flex-auto is-[70px] max-sm:is-full'
-            >
-              <MenuItem value='10'>10</MenuItem>
-              <MenuItem value='25'>25</MenuItem>
-              <MenuItem value='50'>50</MenuItem>
-            </CustomTextField>
-          </div>
-        </div>
+      <Box className='flex flex-wrap justify-between gap-4 p-6'>
+        <DebouncedInput
+          value={search}
+          onChange={value => {
+            const newSearch = String(value)
 
-        <div className='overflow-x-auto'>
-          <table className={tableStyles.table}>
-            <thead>
-              {table.getHeaderGroups().map(headerGroup => (
-                <tr key={headerGroup.id}>
-                  {headerGroup.headers.map(header => (
-                    <th key={header.id}>
-                      {header.isPlaceholder ? null : (
-                        <div
-                          className={classnames({
-                            'flex items-center': header.column.getIsSorted(),
-                            'cursor-pointer select-none': header.column.getCanSort()
-                          })}
-                          onClick={header.column.getToggleSortingHandler()}
-                        >
-                          {flexRender(header.column.columnDef.header, header.getContext())}
-                          {{
-                            asc: <i className='tabler-chevron-up text-xl' />,
-                            desc: <i className='tabler-chevron-down text-xl' />
-                          }[header.column.getIsSorted() as 'asc' | 'desc'] ?? null}
-                        </div>
-                      )}
-                    </th>
+            if (newSearch !== search) {
+              setSearch(newSearch)
+              setPage(1)
+            }
+          }}
+          placeholder='Buscar Producto'
+          className='max-sm:is-full'
+          size='small'
+        />
+        <Box className='flex gap-4'>
+          <Button
+            variant='contained'
+            color='primary'
+            onClick={handleOpenAddDialog}
+            startIcon={<i className='tabler-plus' />}
+          >
+            Agregar Descuento
+          </Button>
+          <CustomTextField
+            select
+            value={pageSize}
+            onChange={e => {
+              setPageSize(Number(e.target.value))
+              setPage(1)
+            }}
+            className='is-[70px]'
+            size='small'
+          >
+            <MenuItem value={10}>10</MenuItem>
+            <MenuItem value={25}>25</MenuItem>
+            <MenuItem value={50}>50</MenuItem>
+            <MenuItem value={100}>100</MenuItem>
+          </CustomTextField>
+        </Box>
+      </Box>
+      {isFetching && !isLoading && (
+        <Box sx={{ px: 3, pb: 2 }}>
+          <Alert severity='info'>Actualizando datos...</Alert>
+        </Box>
+      )}
+      <div className='overflow-x-auto'>
+        <table className={tableStyles.table}>
+          <thead>
+            {table.getHeaderGroups().map(headerGroup => (
+              <tr key={headerGroup.id}>
+                {headerGroup.headers.map(header => (
+                  <th key={header.id} className={tableStyles.cell}>
+                    {header.isPlaceholder ? null : (
+                      <Box
+                        className={classnames({
+                          'flex items-center cursor-pointer select-none': header.column.getCanSort()
+                        })}
+                        onClick={header.column.getToggleSortingHandler()}
+                        sx={{ color: theme.palette.text.primary }}
+                      >
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                        {{
+                          asc: <i className='tabler-chevron-up text-xl' />,
+                          desc: <i className='tabler-chevron-down text-xl' />
+                        }[header.column.getIsSorted() as 'asc' | 'desc'] ?? null}
+                      </Box>
+                    )}
+                  </th>
+                ))}
+              </tr>
+            ))}
+          </thead>
+          {isLoading ? (
+            renderSkeleton()
+          ) : table.getRowModel().rows.length === 0 ? (
+            <tbody>
+              <tr>
+                <td colSpan={columns.length} className='text-center'>
+                  <Typography color='text.secondary' sx={{ py: 4 }}>
+                    No hay productos disponibles
+                  </Typography>
+                </td>
+              </tr>
+            </tbody>
+          ) : (
+            <tbody>
+              {table.getRowModel().rows.map(row => (
+                <tr key={row.original.id}>
+                  {row.getVisibleCells().map(cell => (
+                    <td key={cell.id} className={tableStyles.cell}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
                   ))}
                 </tr>
               ))}
-            </thead>
-            {table.getFilteredRowModel().rows.length === 0 ? (
-              <tbody>
-                <tr>
-                  <td colSpan={table.getVisibleFlatColumns().length} className='text-center'>
-                    No hay productos disponibles
-                  </td>
-                </tr>
-              </tbody>
-            ) : (
-              <tbody>
-                {table
-                  .getRowModel()
-                  .rows.slice(0, table.getState().pagination.pageSize)
-                  .map(row => {
-                    return (
-                      <tr key={row.id} className='hover:bg-actionHover transition-colors duration-200'>
-                        {row.getVisibleCells().map(cell => (
-                          <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
-                        ))}
-                      </tr>
-                    )
-                  })}
-              </tbody>
-            )}
-          </table>
-        </div>
-
-        <TablePagination
-          component={() => <TablePaginationComponent table={table} />}
-          count={table.getFilteredRowModel().rows.length}
-          rowsPerPage={table.getState().pagination.pageSize}
-          page={table.getState().pagination.pageIndex}
-          onPageChange={(_, page) => {
-            table.setPageIndex(page)
-          }}
-        />
-      </Card>
-
-      {/* Modal de descuentos */}
-      <DiscountModal
-        open={discountModalOpen}
-        onClose={() => setDiscountModalOpen(false)}
-        selectedProducts={selectedProducts}
-        allProducts={data}
-        onUpdateDiscounts={handleUpdateDiscounts}
+            </tbody>
+          )}
+        </table>
+      </div>
+      <TablePagination
+        component='div'
+        count={totalRecords}
+        rowsPerPage={pageSize}
+        page={page - 1}
+        onPageChange={(_, newPage) => {
+          setPage(newPage + 1)
+        }}
+        onRowsPerPageChange={event => {
+          setPageSize(parseInt(event.target.value, 10))
+          setPage(1)
+        }}
+        rowsPerPageOptions={[10, 25, 50, 100]}
+        labelRowsPerPage='Filas por página:'
+        labelDisplayedRows={({ from, to, count }) => `${from}–${to} de ${count}`}
       />
-    </>
+
+      {/* Modal para Agregar Descuento */}
+      <Dialog open={addDialogOpen} onClose={handleCloseAddDialog} maxWidth='sm' fullWidth>
+        <DialogTitle>Agregar Descuento</DialogTitle>
+        <DialogContent>
+          <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale='es'>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 2 }}>
+              <CustomTextField
+                select
+                label='Tipo de Descuento'
+                value={discountType}
+                onChange={e => setDiscountType(e.target.value as 'permanent' | 'temporary')}
+                fullWidth
+              >
+                <MenuItem value='permanent'>Descuento Permanente</MenuItem>
+                <MenuItem value='temporary'>Descuento Temporal</MenuItem>
+              </CustomTextField>
+
+              <CustomTextField
+                label='Descripción'
+                value={formData.description}
+                onChange={e => setFormData({ ...formData, description: e.target.value })}
+                fullWidth
+                multiline
+                rows={2}
+              />
+
+              <CustomTextField
+                label='Valor del Descuento (%)'
+                type='number'
+                value={formData.value}
+                onChange={e => setFormData({ ...formData, value: Number(e.target.value) })}
+                fullWidth
+                inputProps={{ min: 0, max: 100 }}
+              />
+
+              {discountType === 'temporary' && (
+                <>
+                  <DatePicker
+                    label='Fecha de Inicio'
+                    value={formData.startDate}
+                    onChange={newValue => setFormData({ ...formData, startDate: newValue })}
+                    slotProps={{
+                      textField: {
+                        fullWidth: true
+                      }
+                    }}
+                  />
+
+                  <DatePicker
+                    label='Fecha de Fin'
+                    value={formData.endDate}
+                    onChange={newValue => setFormData({ ...formData, endDate: newValue })}
+                    slotProps={{
+                      textField: {
+                        fullWidth: true
+                      }
+                    }}
+                  />
+                </>
+              )}
+            </Box>
+          </LocalizationProvider>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseAddDialog} color='secondary'>
+            Cancelar
+          </Button>
+          <Button onClick={handleSubmitDiscount} color='primary' variant='contained'>
+            Crear Descuento
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Card>
   )
 }
 
-export default ProductsTable
+export default DiscountsListTable
