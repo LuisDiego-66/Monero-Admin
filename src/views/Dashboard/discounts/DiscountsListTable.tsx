@@ -1,12 +1,16 @@
 'use client'
 
 import { useEffect, useMemo, useState, useCallback } from 'react'
+import type { SyntheticEvent } from 'react'
 
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import { DatePicker } from '@mui/x-date-pickers/DatePicker'
-import type dayjs from 'dayjs'
+import type { Dayjs } from 'dayjs'
+import dayjs from 'dayjs'
 import 'dayjs/locale/es'
+import Checkbox from '@mui/material/Checkbox'
+import Snackbar from '@mui/material/Snackbar'
 
 import Card from '@mui/material/Card'
 import CardHeader from '@mui/material/CardHeader'
@@ -19,11 +23,11 @@ import Dialog from '@mui/material/Dialog'
 import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
 import DialogActions from '@mui/material/DialogActions'
+import DialogContentText from '@mui/material/DialogContentText'
 import Button from '@mui/material/Button'
 import MenuItem from '@mui/material/MenuItem'
 import TablePagination from '@mui/material/TablePagination'
-import Switch from '@mui/material/Switch'
-import FormControlLabel from '@mui/material/FormControlLabel'
+import IconButton from '@mui/material/IconButton'
 import type { TextFieldProps } from '@mui/material/TextField'
 import { useTheme } from '@mui/material/styles'
 import classnames from 'classnames'
@@ -43,6 +47,13 @@ import {
 import type { ColumnDef, FilterFn } from '@tanstack/react-table'
 import type { RankingInfo } from '@tanstack/match-sorter-utils'
 
+import {
+  useCreatePermanentDiscount,
+  useCreateSeasonalDiscount,
+  useAddDiscountsToProducts,
+  useRemoveDiscountFromProduct
+} from '@/hooks/useDiscounts'
+
 import CustomTextField from '@core/components/mui/TextField'
 import { useProducts } from '@/hooks/useProducts'
 import tableStyles from '@core/styles/table.module.css'
@@ -54,6 +65,12 @@ declare module '@tanstack/table-core' {
   interface FilterMeta {
     itemRank: RankingInfo
   }
+}
+
+export type SnackbarMessage = {
+  key: number
+  message: string
+  severity: 'success' | 'error' | 'info' | 'warning'
 }
 
 const fuzzyFilter: FilterFn<any> = (row, columnId, value, addMeta) => {
@@ -98,14 +115,27 @@ const DiscountsListTable = () => {
   const [search, setSearch] = useState('')
 
   const [addDialogOpen, setAddDialogOpen] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [productToRemoveDiscount, setProductToRemoveDiscount] = useState<number | null>(null)
   const [discountType, setDiscountType] = useState<'permanent' | 'temporary'>('permanent')
 
   const [formData, setFormData] = useState({
     description: '',
     value: 0,
-    startDate: null as dayjs.Dayjs | null,
-    endDate: null as dayjs.Dayjs | null
+    startDate: null as Dayjs | null,
+    endDate: null as Dayjs | null
   })
+
+  const [selectedProducts, setSelectedProducts] = useState<number[]>([])
+
+  const [open, setOpen] = useState<boolean>(false)
+  const [snackPack, setSnackPack] = useState<SnackbarMessage[]>([])
+  const [messageInfo, setMessageInfo] = useState<SnackbarMessage | undefined>(undefined)
+
+  const createPermanentDiscount = useCreatePermanentDiscount()
+  const createSeasonalDiscount = useCreateSeasonalDiscount()
+  const addDiscountsToProducts = useAddDiscountsToProducts()
+  const removeDiscountFromProduct = useRemoveDiscountFromProduct()
 
   const queryParams = useMemo(
     () => ({
@@ -126,7 +156,79 @@ const DiscountsListTable = () => {
     return productsData?.total || 0
   }, [productsData])
 
+  useEffect(() => {
+    if (snackPack.length && !messageInfo) {
+      setOpen(true)
+      setSnackPack(prev => prev.slice(1))
+      setMessageInfo({ ...snackPack[0] })
+    } else if (snackPack.length && messageInfo && open) {
+      setOpen(false)
+    }
+  }, [snackPack, messageInfo, open])
+
+  const showMessage = useCallback((message: string, severity: 'success' | 'error' | 'info' | 'warning') => {
+    setSnackPack(prev => [...prev, { message, severity, key: new Date().getTime() }])
+  }, [])
+
+  const handleSnackbarClose = (event: Event | SyntheticEvent, reason?: string) => {
+    if (reason === 'clickaway') {
+      return
+    }
+
+    setOpen(false)
+  }
+
+  const handleExited = () => {
+    setMessageInfo(undefined)
+  }
+
+  const handleCloseAddDialog = useCallback(() => {
+    setAddDialogOpen(false)
+  }, [])
+
+  const handleSelectAll = useCallback(
+    (checked: boolean) => {
+      if (checked) {
+        const allIds = allProducts.map(product => product.id)
+
+        setSelectedProducts(allIds)
+      } else {
+        setSelectedProducts([])
+      }
+    },
+    [allProducts]
+  )
+
+  const handleSelectProduct = useCallback((productId: number, checked: boolean) => {
+    if (checked) {
+      setSelectedProducts(prev => [...prev, productId])
+    } else {
+      setSelectedProducts(prev => prev.filter(id => id !== productId))
+    }
+  }, [])
+
+  const isProductSelected = useCallback(
+    (productId: number) => {
+      return selectedProducts.includes(productId)
+    },
+    [selectedProducts]
+  )
+
+  const isAllSelected = useMemo(() => {
+    return allProducts.length > 0 && selectedProducts.length === allProducts.length
+  }, [allProducts, selectedProducts])
+
+  const isIndeterminate = useMemo(() => {
+    return selectedProducts.length > 0 && selectedProducts.length < allProducts.length
+  }, [allProducts, selectedProducts])
+
   const handleOpenAddDialog = useCallback(() => {
+    if (selectedProducts.length === 0) {
+      showMessage('Debe seleccionar al menos un producto', 'warning')
+
+      return
+    }
+
     setFormData({
       description: '',
       value: 0,
@@ -135,35 +237,111 @@ const DiscountsListTable = () => {
     })
     setDiscountType('permanent')
     setAddDialogOpen(true)
-  }, [])
-
-  const handleCloseAddDialog = useCallback(() => {
-    setAddDialogOpen(false)
-  }, [])
+  }, [selectedProducts, showMessage])
 
   const handleSubmitDiscount = useCallback(async () => {
-    try {
-      const payload: any = {
-        description: formData.description,
-        isActive: true,
-        value: formData.value
-      }
+    if (selectedProducts.length === 0) {
+      showMessage('Debe seleccionar al menos un producto', 'warning')
 
-      if (discountType === 'temporary') {
-        payload.startDate = formData.startDate?.toISOString()
-        payload.endDate = formData.endDate?.toISOString()
-      }
-
-      console.log('Crear descuento:', payload)
-
-      handleCloseAddDialog()
-    } catch (error) {
-      console.error('Error al crear descuento:', error)
+      return
     }
-  }, [formData, discountType, handleCloseAddDialog])
+
+    if (!formData.description || formData.value <= 0) {
+      showMessage('Complete todos los campos correctamente', 'warning')
+
+      return
+    }
+
+    if (discountType === 'temporary' && (!formData.startDate || !formData.endDate)) {
+      showMessage('Debe seleccionar las fechas de inicio y fin', 'warning')
+
+      return
+    }
+
+    try {
+      let discountResponse
+
+      if (discountType === 'permanent') {
+        discountResponse = await createPermanentDiscount.mutateAsync({
+          description: formData.description,
+          isActive: true,
+          value: formData.value
+        })
+      } else {
+        discountResponse = await createSeasonalDiscount.mutateAsync({
+          description: formData.description,
+          isActive: true,
+          value: formData.value,
+          startDate: formData.startDate!.toISOString(),
+          endDate: formData.endDate!.toISOString()
+        })
+      }
+
+      await addDiscountsToProducts.mutateAsync({
+        productsIds: selectedProducts,
+        discountId: discountResponse.id
+      })
+
+      showMessage(`Descuento creado y asignado a ${selectedProducts.length} producto(s)`, 'success')
+      handleCloseAddDialog()
+      setSelectedProducts([])
+    } catch (error) {
+      console.error('Error al crear y asignar descuento:', error)
+      showMessage(error instanceof Error ? error.message : 'Error al crear descuento', 'error')
+    }
+  }, [
+    selectedProducts,
+    formData,
+    discountType,
+    createPermanentDiscount,
+    createSeasonalDiscount,
+    addDiscountsToProducts,
+    handleCloseAddDialog,
+    showMessage
+  ])
+
+  const handleOpenDeleteDialog = useCallback((productId: number) => {
+    setProductToRemoveDiscount(productId)
+    setDeleteDialogOpen(true)
+  }, [])
+
+  const handleCloseDeleteDialog = useCallback(() => {
+    setDeleteDialogOpen(false)
+    setProductToRemoveDiscount(null)
+  }, [])
+
+  const handleConfirmRemoveDiscount = useCallback(async () => {
+    if (productToRemoveDiscount) {
+      try {
+        await removeDiscountFromProduct.mutateAsync(productToRemoveDiscount)
+        showMessage('Descuento eliminado correctamente', 'success')
+        handleCloseDeleteDialog()
+      } catch (error) {
+        showMessage('Error al eliminar descuento', 'error')
+      }
+    }
+  }, [productToRemoveDiscount, removeDiscountFromProduct, showMessage, handleCloseDeleteDialog])
 
   const columns = useMemo<ColumnDef<any, any>[]>(
     () => [
+      {
+        id: 'select',
+        header: ({ table }: any) => (
+          <Checkbox
+            checked={isAllSelected}
+            indeterminate={isIndeterminate}
+            onChange={e => handleSelectAll(e.target.checked)}
+          />
+        ),
+        cell: ({ row }: any) => (
+          <Checkbox
+            checked={isProductSelected(row.original.id)}
+            onChange={e => handleSelectProduct(row.original.id, e.target.checked)}
+            onClick={e => e.stopPropagation()}
+          />
+        ),
+        enableSorting: false
+      },
       {
         accessorKey: 'id',
         header: 'ID',
@@ -268,14 +446,36 @@ const DiscountsListTable = () => {
             return <Chip label='Sin descuento' size='small' variant='outlined' color='default' />
           }
 
+          const discountTypeLabel = discount.startDate && discount.endDate ? 'Temporal' : 'Permanente'
+
           return (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-              <Chip label={`${discount.value}% OFF`} size='small' color='success' variant='tonal' />
-              {discount.description && (
-                <Typography variant='caption' color='text.secondary' sx={{ fontSize: '0.7rem' }}>
-                  {discount.description}
-                </Typography>
-              )}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+                  <Chip label={`${discount.value}% OFF`} size='small' color='success' variant='tonal' />
+                  <Chip label={discountTypeLabel} size='small' color='info' variant='outlined' />
+                </Box>
+                {discount.description && (
+                  <Typography variant='caption' color='text.secondary' sx={{ fontSize: '0.7rem' }}>
+                    {discount.description}
+                  </Typography>
+                )}
+                {discount.startDate && discount.endDate && (
+                  <Typography variant='caption' color='text.secondary' sx={{ fontSize: '0.65rem' }}>
+                    {dayjs(discount.startDate).format('DD/MM/YYYY')} - {dayjs(discount.endDate).format('DD/MM/YYYY')}
+                  </Typography>
+                )}
+              </Box>
+              <IconButton
+                size='small'
+                color='error'
+                onClick={e => {
+                  e.stopPropagation()
+                  handleOpenDeleteDialog(row.original.id)
+                }}
+              >
+                <i className='tabler-x' />
+              </IconButton>
             </Box>
           )
         }
@@ -298,7 +498,7 @@ const DiscountsListTable = () => {
         }
       }
     ],
-    []
+    [isAllSelected, isIndeterminate, handleSelectAll, isProductSelected, handleSelectProduct, handleOpenDeleteDialog]
   )
 
   const table = useReactTable({
@@ -393,6 +593,13 @@ const DiscountsListTable = () => {
           <Alert severity='info'>Actualizando datos...</Alert>
         </Box>
       )}
+      {selectedProducts.length > 0 && (
+        <Box sx={{ px: 3, pb: 2 }}>
+          <Alert severity='info' onClose={() => setSelectedProducts([])}>
+            {selectedProducts.length} producto(s) seleccionado(s)
+          </Alert>
+        </Box>
+      )}
       <div className='overflow-x-auto'>
         <table className={tableStyles.table}>
           <thead>
@@ -464,7 +671,6 @@ const DiscountsListTable = () => {
         labelDisplayedRows={({ from, to, count }) => `${from}–${to} de ${count}`}
       />
 
-      {/* Modal para Agregar Descuento */}
       <Dialog open={addDialogOpen} onClose={handleCloseAddDialog} maxWidth='sm' fullWidth>
         <DialogTitle>Agregar Descuento</DialogTitle>
         <DialogContent>
@@ -492,11 +698,19 @@ const DiscountsListTable = () => {
 
               <CustomTextField
                 label='Valor del Descuento (%)'
-                type='number'
-                value={formData.value}
-                onChange={e => setFormData({ ...formData, value: Number(e.target.value) })}
+                value={formData.value === 0 ? '' : formData.value}
+                onChange={e => {
+                  const value = e.target.value
+
+                  if (value === '' || /^\d+$/.test(value)) {
+                    const numValue = value === '' ? 0 : parseInt(value, 10)
+
+                    if (numValue <= 100) {
+                      setFormData({ ...formData, value: numValue })
+                    }
+                  }
+                }}
                 fullWidth
-                inputProps={{ min: 0, max: 100 }}
               />
 
               {discountType === 'temporary' && (
@@ -536,6 +750,41 @@ const DiscountsListTable = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Dialog open={deleteDialogOpen} onClose={handleCloseDeleteDialog}>
+        <DialogTitle>Confirmar eliminación</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            ¿Estás seguro de que deseas eliminar el descuento de este producto? Esta acción no se puede deshacer.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeleteDialog} color='secondary'>
+            Cancelar
+          </Button>
+          <Button onClick={handleConfirmRemoveDiscount} color='error' variant='contained'>
+            Eliminar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar
+        open={open}
+        onClose={handleSnackbarClose}
+        autoHideDuration={3000}
+        TransitionProps={{ onExited: handleExited }}
+        key={messageInfo ? messageInfo.key : undefined}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          variant='filled'
+          onClose={handleSnackbarClose}
+          className='is-full shadow-xs items-center'
+          severity={messageInfo?.severity || 'info'}
+        >
+          {messageInfo?.message}
+        </Alert>
+      </Snackbar>
     </Card>
   )
 }
