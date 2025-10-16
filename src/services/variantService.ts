@@ -8,7 +8,9 @@ import type {
   CreateBrandDto,
   MultimediaUploadResponse,
   VariantsResponse,
-  BrandsResponse
+  BrandsResponse,
+  AddStockRequest,
+  AddStockResponse
 } from '@/types/api/variants'
 
 class VariantServiceClass {
@@ -35,6 +37,11 @@ class VariantServiceClass {
 
   async createVariant(data: CreateVariantDto): Promise<Variant> {
     const response = await apiClient.post<Variant>('/api/variants', data)
+
+    return response.data
+  }
+  async addStock(data: AddStockRequest): Promise<AddStockResponse> {
+    const response = await apiClient.post<AddStockResponse>('/api/variants/addstock', data)
 
     return response.data
   }

@@ -72,3 +72,16 @@ export interface BrandsResponse {
   brands: Brand[]
   total?: number
 }
+export type AddStockRequest = {
+  quantity: number
+  variantId: number
+}
+
+export type AddStockResponse = {
+  id: number
+  quantity: number
+  createdAt: string
+  variant: {
+    id: number
+  }
+}

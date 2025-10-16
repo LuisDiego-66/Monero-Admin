@@ -5,7 +5,7 @@ import { useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { variantService } from '@/services/variantService'
-import type { CreateVariantDto, UpdateVariantDto, CreateBrandDto } from '@/types/api/variants'
+import type { CreateVariantDto, UpdateVariantDto, CreateBrandDto, AddStockRequest } from '@/types/api/variants'
 
 export const useVariantsByProduct = (productId: string | number | undefined) => {
   const numericProductId = useMemo(() => {
@@ -66,6 +66,27 @@ export const useUpdateVariant = () => {
         queryKey: ['variants', 'product', variables.data.productId],
         refetchType: 'active'
       })
+    }
+  })
+}
+
+export const useAddStock = () => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (data: AddStockRequest) => variantService.addStock(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['variants'],
+        refetchType: 'active'
+      })
+      queryClient.invalidateQueries({
+        queryKey: ['variant'],
+        refetchType: 'active'
+      })
+    },
+    onError: error => {
+      console.error('Error adding stock:', error)
     }
   })
 }

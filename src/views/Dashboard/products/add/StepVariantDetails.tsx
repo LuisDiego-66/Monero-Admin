@@ -16,12 +16,8 @@ import Alert from '@mui/material/Alert'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
 import CardHeader from '@mui/material/CardHeader'
-import Table from '@mui/material/Table'
-import TableBody from '@mui/material/TableBody'
-import TableCell from '@mui/material/TableCell'
-import TableContainer from '@mui/material/TableContainer'
-import TableHead from '@mui/material/TableHead'
-import TableRow from '@mui/material/TableRow'
+import { useQueryClient } from '@tanstack/react-query'
+
 import CircularProgress from '@mui/material/CircularProgress'
 import { toast } from 'react-toastify'
 import { HexColorPicker } from 'react-colorful'
@@ -42,6 +38,9 @@ import {
 import type { Color, Variant } from '@/types/api/variants'
 import { variantFormSchema, newColorSchema } from '@/schemas/variant.schema'
 import type { VariantFormData, MediaFile, NewColorForm, VariantSizeForm } from '@/schemas/variant.schema'
+import VariantsList from './components/VariantsList'
+import VariantMediaUploader from './components/VariantMediaUploader'
+import AddStockModal from './components/AddStockModal'
 
 type Props = {
   activeStep: number
@@ -56,8 +55,7 @@ type Props = {
 
 const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, productName, productCreated }: Props) => {
   const router = useRouter()
-
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const queryClient = useQueryClient()
 
   const [variantForm, setVariantForm] = useState<VariantFormData>({
     colorId: '',
@@ -72,8 +70,8 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
   const [colorError, setColorError] = useState<string | null>(null)
   const [filesError, setFilesError] = useState<string | null>(null)
   const [sizesError, setSizesError] = useState<string | null>(null)
+  const [addStockModalOpen, setAddStockModalOpen] = useState(false)
 
-  const [isDragging, setIsDragging] = useState(false)
   const [colorModalOpen, setColorModalOpen] = useState(false)
 
   const [newColor, setNewColor] = useState<NewColorForm>({
@@ -129,107 +127,6 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
     setColorError(null)
     setFilesError(null)
     setSizesError(null)
-  }
-
-  const isValidFileType = (file: File): boolean => {
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'video/mp4', 'application/pdf']
-
-    return validTypes.includes(file.type)
-  }
-
-  const processFiles = (files: FileList) => {
-    const newFiles: MediaFile[] = []
-    const invalidFiles: string[] = []
-
-    Array.from(files).forEach(file => {
-      if (isValidFileType(file)) {
-        const mediaFile: MediaFile = {
-          id: Date.now() + Math.random().toString(),
-          file,
-          url: URL.createObjectURL(file),
-          type: file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : 'document',
-          name: file.name,
-          source: 'new' as const
-        }
-
-        newFiles.push(mediaFile)
-      } else {
-        invalidFiles.push(file.name)
-      }
-    })
-
-    if (invalidFiles.length > 0) {
-      setFilesError(`Formato no válido: ${invalidFiles.join(', ')}. Solo se permiten JPG, JPEG, PNG, MP4, PDF`)
-      toast.error(`${invalidFiles.length} archivo(s) con formato no válido`)
-    }
-
-    if (newFiles.length > 0) {
-      setVariantForm(prev => ({
-        ...prev,
-        mediaFiles: [...prev.mediaFiles, ...newFiles]
-      }))
-      setFilesError(null)
-      toast.success(`${newFiles.length} archivo(s) agregado(s)`)
-    }
-  }
-
-  const handleDragEnter = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragging(true)
-  }
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragging(false)
-  }
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-  }
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragging(false)
-    const files = e.dataTransfer.files
-
-    if (files.length > 0) {
-      processFiles(files)
-    }
-  }
-
-  const handleFileInputClick = () => {
-    fileInputRef.current?.click()
-  }
-
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-
-    if (files && files.length > 0) {
-      processFiles(files)
-    }
-
-    e.target.value = ''
-  }
-
-  const handleRemoveFile = (id: string) => {
-    setVariantForm(prev => {
-      const fileToRemove = prev.mediaFiles.find(f => f.id === id)
-
-      if (fileToRemove && fileToRemove.file) {
-        URL.revokeObjectURL(fileToRemove.url)
-      }
-
-      return {
-        ...prev,
-        mediaFiles: prev.mediaFiles.filter(f => f.id !== id)
-      }
-    })
-    setFilesError(null)
-    toast.success('Archivo eliminado')
   }
 
   const handleAddSize = () => {
@@ -351,10 +248,9 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
         url => typeof url === 'string' && url.startsWith('http')
       )
 
-      // ✅ MODIFICACIÓN PRINCIPAL: Filtrar solo tallas nuevas en modo edición
       const normalizedVariants = isEditing
         ? validatedData.sizes
-            .filter(s => !s.id) // Solo las nuevas (sin id)
+            .filter(s => !s.id)
             .map(s => ({
               size: typeof s.size === 'object' ? (s.size as any).name : s.size,
               quantity: s.quantity || 0
@@ -365,11 +261,10 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
           }))
 
       if (isEditing && editingVariantId) {
-        // ✅ Para UPDATE: Siempre enviar colorName, colorCode, multimedia, pdfs y variants
         const updateData = {
           multimedia: finalMultimediaUrls,
           pdfs: finalPdfUrls,
-          variants: normalizedVariants, // Vacío [] si no hay nuevas, o con las nuevas
+          variants: normalizedVariants,
           colorName: selectedColor.name,
           colorCode: selectedColor.code
         }
@@ -378,9 +273,11 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
           id: editingVariantId,
           data: updateData
         })
+        await queryClient.refetchQueries({
+          queryKey: ['variants', 'product', parseInt(productId!)]
+        })
         toast.success('Variante actualizada exitosamente')
       } else {
-        // ✅ Para CREATE: Enviar todo incluyendo productId
         const createData = {
           multimedia: finalMultimediaUrls,
           pdfs: finalPdfUrls,
@@ -598,182 +495,12 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
             }
           />
           <CardContent>
-            <Box sx={{ mb: 3 }}>
-              <Typography
-                variant='subtitle2'
-                gutterBottom
-                sx={{
-                  color: filesError ? 'error.main' : 'text.primary'
-                }}
-              >
-                Archivos Multimedia
-              </Typography>
-              <Box
-                sx={{
-                  border: '2px dashed',
-                  borderColor: filesError ? 'error.main' : isDragging ? 'primary.main' : 'divider',
-                  borderRadius: 1,
-                  p: 3,
-                  textAlign: 'center',
-                  backgroundColor: filesError
-                    ? 'rgba(211, 47, 47, 0.04)'
-                    : isDragging
-                      ? 'action.hover'
-                      : 'background.paper',
-                  cursor: 'pointer',
-                  minHeight: '120px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'center'
-                }}
-                onDragEnter={handleDragEnter}
-                onDragLeave={handleDragLeave}
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-                onClick={handleFileInputClick}
-              >
-                <i
-                  className='tabler-cloud-upload'
-                  style={{
-                    fontSize: '2rem',
-                    color: filesError ? 'var(--mui-palette-error-main)' : 'var(--mui-palette-primary-main)'
-                  }}
-                />
-                <Typography variant='body2' color={filesError ? 'error' : 'text.secondary'} sx={{ mt: 1 }}>
-                  {isDragging ? 'Suelta aquí los archivos' : 'Arrastra imágenes/videos o haz clic para seleccionar'}
-                </Typography>
-                <Typography variant='caption' color={filesError ? 'error' : 'text.secondary'}>
-                  Formatos: JPG, JPEG, PNG, MP4, PDF
-                </Typography>
-              </Box>
-              <input
-                ref={fileInputRef}
-                type='file'
-                multiple
-                accept='image/*,video/*,.pdf'
-                style={{ display: 'none' }}
-                onChange={handleFileInputChange}
-              />
-              {filesError && (
-                <Typography
-                  sx={{
-                    display: 'block',
-                    mt: 1,
-                    color: 'error.main'
-                  }}
-                >
-                  {filesError}
-                </Typography>
-              )}
-
-              {variantForm.mediaFiles.length > 0 && (
-                <Box sx={{ mt: 2 }}>
-                  {variantForm.mediaFiles.filter(f => f.type !== 'document').length > 0 && (
-                    <Box sx={{ mb: 3 }}>
-                      <Typography variant='caption' color='primary' sx={{ mb: 1, display: 'block', fontWeight: 600 }}>
-                        🖼️ IMÁGENES Y VIDEOS ({variantForm.mediaFiles.filter(f => f.type !== 'document').length})
-                      </Typography>
-                      <Grid container spacing={2}>
-                        {variantForm.mediaFiles
-                          .filter(f => f.type !== 'document')
-                          .map(file => (
-                            <Grid size={{ xs: 6, sm: 4, md: 3 }} key={file.id}>
-                              <Box
-                                sx={{
-                                  position: 'relative',
-                                  width: '100%',
-                                  height: '120px',
-                                  border: '1px solid',
-                                  borderColor: 'divider',
-                                  borderRadius: 1,
-                                  overflow: 'hidden'
-                                }}
-                              >
-                                {file.type === 'image' ? (
-                                  <img
-                                    src={file.url}
-                                    alt={file.name}
-                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                  />
-                                ) : (
-                                  <video src={file.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                )}
-                                <IconButton
-                                  size='small'
-                                  color='error'
-                                  onClick={() => handleRemoveFile(file.id)}
-                                  sx={{
-                                    position: 'absolute',
-                                    top: 4,
-                                    right: 4,
-                                    backgroundColor: 'rgba(0,0,0,0.7)',
-                                    color: 'white',
-                                    '&:hover': { backgroundColor: 'rgba(0,0,0,0.9)' }
-                                  }}
-                                >
-                                  <i className='tabler-x' style={{ fontSize: '16px' }} />
-                                </IconButton>
-                              </Box>
-                            </Grid>
-                          ))}
-                      </Grid>
-                    </Box>
-                  )}
-
-                  {variantForm.mediaFiles.filter(f => f.type === 'document').length > 0 && (
-                    <Box>
-                      <Typography variant='caption' color='secondary' sx={{ mb: 1, display: 'block', fontWeight: 600 }}>
-                        📄 DOCUMENTOS PDF ({variantForm.mediaFiles.filter(f => f.type === 'document').length})
-                      </Typography>
-                      <Grid container spacing={2}>
-                        {variantForm.mediaFiles
-                          .filter(f => f.type === 'document')
-                          .map(file => (
-                            <Grid size={{ xs: 6, sm: 4, md: 3 }} key={file.id}>
-                              <Box
-                                sx={{
-                                  position: 'relative',
-                                  width: '100%',
-                                  height: '100px',
-                                  border: '1px solid',
-                                  borderColor: 'divider',
-                                  borderRadius: 1,
-                                  overflow: 'hidden',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  backgroundColor: 'rgba(255,0,0,0.05)'
-                                }}
-                              >
-                                <i className='tabler-file-type-pdf' style={{ fontSize: '2.5rem', color: '#d32f2f' }} />
-                                <Typography variant='caption' sx={{ mt: 1, textAlign: 'center', px: 1 }}>
-                                  {file.name.length > 20 ? file.name.substring(0, 20) + '...' : file.name}
-                                </Typography>
-                                <IconButton
-                                  size='small'
-                                  color='error'
-                                  onClick={() => handleRemoveFile(file.id)}
-                                  sx={{
-                                    position: 'absolute',
-                                    top: 4,
-                                    right: 4,
-                                    backgroundColor: 'rgba(0,0,0,0.7)',
-                                    color: 'white',
-                                    '&:hover': { backgroundColor: 'rgba(0,0,0,0.9)' }
-                                  }}
-                                >
-                                  <i className='tabler-x' style={{ fontSize: '16px' }} />
-                                </IconButton>
-                              </Box>
-                            </Grid>
-                          ))}
-                      </Grid>
-                    </Box>
-                  )}
-                </Box>
-              )}
-            </Box>
+            <VariantMediaUploader
+              mediaFiles={variantForm.mediaFiles}
+              onFilesChange={files => setVariantForm(prev => ({ ...prev, mediaFiles: files }))}
+              error={filesError}
+              onErrorChange={setFilesError}
+            />
 
             <Box sx={{ mb: 3 }}>
               <Typography variant='subtitle2' gutterBottom>
@@ -887,14 +614,28 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
                 >
                   Tallas y Stock
                 </Typography>
-                <Button
-                  variant='outlined'
-                  size='small'
-                  startIcon={<i className='tabler-plus' />}
-                  onClick={handleAddSize}
-                >
-                  Añadir Talla
-                </Button>
+
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  {isEditing && variantForm.sizes.some(s => s.id) && (
+                    <Button
+                      variant='contained'
+                      size='small'
+                      color='success'
+                      startIcon={<i className='tabler-plus' />}
+                      onClick={() => setAddStockModalOpen(true)}
+                    >
+                      Agregar Stock
+                    </Button>
+                  )}
+                  <Button
+                    variant='outlined'
+                    size='small'
+                    startIcon={<i className='tabler-plus' />}
+                    onClick={handleAddSize}
+                  >
+                    Añadir Talla
+                  </Button>
+                </Box>
               </Box>
 
               {variantForm.sizes.map((size, index) => (
@@ -956,7 +697,7 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
                   sx={{
                     display: 'block',
                     mt: 1,
-                    color: 'var(--mui-palette-error-main)' // ← Asegura que el error sea rojo
+                    color: 'var(--mui-palette-error-main)'
                   }}
                 >
                   {sizesError}
@@ -999,114 +740,12 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
       </Grid>
 
       <Grid size={{ xs: 12, lg: 5 }}>
-        <Card sx={{ height: 'fit-content', position: 'sticky', top: 20 }}>
-          <CardHeader
-            title={`Variantes Creadas (${existingVariants?.variants?.length || 0})`}
-            subheader='Click para editar'
-            titleTypographyProps={{ variant: 'h6' }}
-          />
-          <CardContent sx={{ p: 0, maxHeight: '500px', overflow: 'auto' }}>
-            {variantsLoading ? (
-              <Box display='flex' justifyContent='center' alignItems='center' py={4}>
-                <CircularProgress size={24} />
-                <Typography variant='body2' sx={{ ml: 2 }}>
-                  Cargando variantes...
-                </Typography>
-              </Box>
-            ) : existingVariants?.variants?.length ? (
-              <TableContainer>
-                <Table size='small'>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Color</TableCell>
-                      <TableCell>Tallas</TableCell>
-                      <TableCell>Imagen</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {existingVariants.variants.map(variant => (
-                      <TableRow
-                        key={variant.id}
-                        hover
-                        sx={{
-                          cursor: 'pointer',
-                          backgroundColor: editingVariantId === Number(variant.id) ? 'action.selected' : 'transparent'
-                        }}
-                        onClick={() => handleEditVariant(variant)}
-                      >
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <Box
-                              sx={{
-                                width: 20,
-                                height: 20,
-                                borderRadius: '50%',
-                                backgroundColor: variant.color?.code || variant.colorCode,
-                                border: '1px solid #ddd'
-                              }}
-                            />
-                            <Typography variant='caption'>{variant.color?.name || variant.colorName}</Typography>
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant='caption'>
-                            {variant.variants
-                              .map(s => (typeof s.size === 'object' ? (s.size as any).name : s.size))
-                              .join(', ')}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <div className='flex items-center gap-1'>
-                            {variant.multimedia
-                              .filter(url => {
-                                const ext = url.split('.').pop()?.toLowerCase() || ''
-
-                                return ['jpg', 'jpeg', 'png'].includes(ext)
-                              })
-                              .slice(0, 3)
-                              .map((url, idx) => (
-                                <Box
-                                  key={idx}
-                                  sx={{
-                                    width: 24,
-                                    height: 24,
-                                    borderRadius: 0.5,
-                                    overflow: 'hidden',
-                                    border: '1px solid',
-                                    borderColor: 'divider'
-                                  }}
-                                >
-                                  <img src={url} alt='' style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                </Box>
-                              ))}
-                            {variant.multimedia.length > 3 && (
-                              <Typography variant='caption' sx={{ fontSize: '10px', color: 'text.secondary' }}>
-                                +{variant.multimedia.length - 3}
-                              </Typography>
-                            )}
-                            {variant.multimedia.length === 0 && (
-                              <Typography variant='caption' color='text.secondary'>
-                                Sin imagen
-                              </Typography>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            ) : (
-              <Box textAlign='center' py={4} color='text.secondary'>
-                <i className='tabler-package' style={{ fontSize: '2rem', opacity: 0.3 }} />
-                <Typography variant='body2' sx={{ mt: 1 }}>
-                  No hay variantes creadas
-                </Typography>
-                <Typography variant='caption'>Crea la primera variante del producto</Typography>
-              </Box>
-            )}
-          </CardContent>
-        </Card>
+        <VariantsList
+          variants={existingVariants?.variants || []}
+          isLoading={variantsLoading}
+          editingVariantId={editingVariantId}
+          onVariantClick={handleEditVariant}
+        />
       </Grid>
 
       {existingVariants?.variants?.length ? (
@@ -1214,6 +853,26 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
           </Button>
         </DialogActions>
       </Dialog>
+      {isEditing && variantForm.sizes.length > 0 && (
+        <AddStockModal
+          open={addStockModalOpen}
+          onClose={() => {
+            setAddStockModalOpen(false)
+
+            if (editingVariantId) {
+              setVariantToLoadId(editingVariantId)
+            }
+          }}
+          variants={variantForm.sizes
+            .filter(s => s.id)
+            .map(s => ({
+              id: s.id!,
+              size: { name: s.size },
+              availableStock: s.quantity
+            }))}
+          variantId={editingVariantId!}
+        />
+      )}
     </Grid>
   )
 }
