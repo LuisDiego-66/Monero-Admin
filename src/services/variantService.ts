@@ -92,6 +92,33 @@ class VariantServiceClass {
 
     return response.data
   }
+
+  async getAllVariants(
+    page: number = 1,
+    limit: number = 6,
+    search: string = ''
+  ): Promise<{
+    data: Variant[]
+    meta: {
+      total: number
+      page: number
+      lastPage: number
+      limit: number
+      offset: number
+      hasNextPage: boolean
+      hasPreviousPage: boolean
+    }
+  }> {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+      ...(search && { search })
+    })
+
+    const response = await apiClient.get(`/api/variants?${params}`)
+
+    return response.data
+  }
 }
 
 export const variantService = new VariantServiceClass()

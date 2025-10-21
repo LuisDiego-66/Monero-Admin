@@ -12,33 +12,34 @@ import type {
 } from '@/types/api/sales'
 
 class CartServiceClass {
-
-    //Agregar items al carrito
+  //Agregar items al carrito
   async addToCart(data: CartRequest): Promise<CartResponse> {
     const response = await apiClient.post<CartResponse>('/api/cart', data)
+
     return response.data
   }
 
- //  Verificar disponibilidad y obtener precios actualizados
-  
-  
+  //  Verificar disponibilidad y obtener precios actualizados
+
   async repriceCart(token: string): Promise<RepriceResponse> {
     const response = await apiClient.post<RepriceResponse>(`/api/orders/reprice/${token}`)
+
     return response.data
   }
 
   //Crear orden
- 
+
   async createOrder(data: CreateOrderRequest): Promise<Order> {
-    const response = await apiClient.post<Order>('/api/orders', data)
+    const response = await apiClient.post<Order>('/api/orders/in-store', data)
+
     return response.data
   }
 
+  //Confirmar orden y pagar
 
-    //Confirmar orden y pagar
-  
   async confirmOrder(orderId: number, data: ConfirmOrderRequest): Promise<ConfirmOrderResponse> {
     const response = await apiClient.post<ConfirmOrderResponse>(`/api/orders/confirm/${orderId}`, data)
+
     return response.data
   }
 }

@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query'
 
 import { variantService } from '@/services/variantService'
 import type { CreateVariantDto, UpdateVariantDto, CreateBrandDto, AddStockRequest } from '@/types/api/variants'
@@ -141,5 +141,17 @@ export const useCreateBrand = () => {
     onError: error => {
       console.error('Error creating brand:', error)
     }
+  })
+}
+
+export const useInfiniteVariants = (limit: number = 6, search: string = '') => {
+  return useInfiniteQuery({
+    queryKey: ['variants', 'infinite', limit, search],
+    queryFn: ({ pageParam = 1 }) => variantService.getAllVariants(pageParam, limit, search),
+    getNextPageParam: lastPage => {
+      return lastPage.meta.hasNextPage ? lastPage.meta.page + 1 : undefined
+    },
+    initialPageParam: 1,
+    staleTime: 30000
   })
 }
