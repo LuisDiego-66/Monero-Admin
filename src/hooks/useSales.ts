@@ -42,3 +42,13 @@ export const useConfirmOrder = () => {
     }
   })
 }
+
+export const useCancelOrder = () => {
+  return useMutation({
+    mutationFn: (orderId: number) => cartService.cancelOrder(orderId),
+    onError: (error: any) => {
+      console.error('Error cancelling order:', error)
+      throw error
+    }
+  })
+}

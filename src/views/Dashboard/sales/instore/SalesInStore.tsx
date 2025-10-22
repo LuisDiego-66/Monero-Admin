@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo, useRef, useCallback } from 'react'
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 
 import {
   Grid,
@@ -34,10 +34,11 @@ import {
   CircularProgress,
   Stepper,
   Step,
-  StepLabel
+  StepLabel,
+  LinearProgress
 } from '@mui/material'
 
-import { useAddToCart, useRepriceCart, useCreateOrder, useConfirmOrder } from '@/hooks/useSales'
+import { useAddToCart, useRepriceCart, useCreateOrder, useConfirmOrder, useCancelOrder } from '@/hooks/useSales'
 import { useInfiniteVariants } from '@/hooks/useVariants'
 import type { CartItem, RepriceResponse, Order } from '@/types/api/sales'
 import type { Variant, VariantSize } from '@/types/api/variants'
@@ -112,6 +113,14 @@ const QRContainer = styled(Box)(({ theme }) => ({
   marginTop: theme.spacing(2)
 }))
 
+const TimerBox = styled(Paper)(({ theme }) => ({
+  padding: theme.spacing(2),
+  marginBottom: theme.spacing(2),
+  backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 152, 0, 0.1)' : 'rgba(255, 152, 0, 0.05)',
+  border: `1px solid ${theme.palette.warning.main}`,
+  borderRadius: 8
+}))
+
 interface CartItemLocal extends CartItem {
   variantInfo?: any
 }
@@ -123,7 +132,7 @@ interface PaymentMethod {
   color: string
 }
 
-type SaleStep = 'BUILDING_CART' | 'VERIFYING_STOCK' | 'ORDER_CREATED' | 'PAYMENT' | 'COMPLETED'
+type SaleStep = 'BUILDING_CART' | 'VERIFYING_STOCK' | 'ORDER_CREATED' | 'PAYMENT' | 'COMPLETED' | 'CANCELLED'
 
 const paymentMethods: PaymentMethod[] = [
   { id: 'efectivo', name: 'Efectivo', icon: '💵', color: '#4caf50' },
@@ -165,13 +174,19 @@ const PointOfSale: React.FC = () => {
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string>('')
 
+  const [timeRemaining, setTimeRemaining] = useState<number>(0)
+  const [orderExpiresAt, setOrderExpiresAt] = useState<Date | null>(null)
+  const [showCancelDialog, setShowCancelDialog] = useState(false)
+
   const catalogScrollRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout>()
+  const timerIntervalRef = useRef<NodeJS.Timeout>()
 
   const addToCartMutation = useAddToCart()
   const repriceMutation = useRepriceCart()
   const createOrderMutation = useCreateOrder()
   const confirmOrderMutation = useConfirmOrder()
+  const cancelOrderMutation = useCancelOrder()
 
   const {
     data: variantsPages,
@@ -181,7 +196,7 @@ const PointOfSale: React.FC = () => {
     isLoading: isLoadingVariants
   } = useInfiniteVariants(6, debouncedSearch)
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current)
     }
@@ -196,6 +211,28 @@ const PointOfSale: React.FC = () => {
       }
     }
   }, [searchTerm])
+
+  useEffect(() => {
+    if (orderExpiresAt) {
+      timerIntervalRef.current = setInterval(() => {
+        const now = new Date().getTime()
+        const expiration = orderExpiresAt.getTime()
+        const remaining = Math.max(0, Math.floor((expiration - now) / 1000))
+
+        setTimeRemaining(remaining)
+
+        if (remaining === 0) {
+          handleOrderExpired()
+        }
+      }, 1000)
+    }
+
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current)
+      }
+    }
+  }, [orderExpiresAt])
 
   const flattenedVariants = useMemo(() => {
     if (!variantsPages) return []
@@ -228,6 +265,13 @@ const PointOfSale: React.FC = () => {
       currency: 'COP',
       minimumFractionDigits: 0
     }).format(numAmount)
+  }
+
+  const formatTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60)
+    const secs = seconds % 60
+
+    return `${minutes}:${secs.toString().padStart(2, '0')}`
   }
 
   const getVariantInfo = (variantId: number) => {
@@ -284,6 +328,12 @@ const PointOfSale: React.FC = () => {
     setActiveStepIndex(0)
     setSelectedPayment('')
     setErrorMessage('')
+    setTimeRemaining(0)
+    setOrderExpiresAt(null)
+
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current)
+    }
   }
 
   const verifyStockAndPrices = async () => {
@@ -343,6 +393,13 @@ const PointOfSale: React.FC = () => {
       const order = await createOrderMutation.mutateAsync(payload)
 
       setOrderData(order)
+
+      if (order.expiresAt) {
+        const expirationDate = new Date(order.expiresAt)
+
+        setOrderExpiresAt(expirationDate)
+      }
+
       setShowPaymentDialog(true)
     } catch (error: any) {
       setErrorMessage(error?.response?.data?.message || 'Error al crear la orden')
@@ -374,8 +431,60 @@ const PointOfSale: React.FC = () => {
 
       setCurrentStep('COMPLETED')
       setShowPaymentDialog(false)
+
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current)
+      }
     } catch (error: any) {
       setErrorMessage(error?.response?.data?.message || 'Error al procesar el pago')
+    }
+  }
+
+  const handleCancelOrder = async () => {
+    if (!orderData) return
+
+    try {
+      await cancelOrderMutation.mutateAsync(orderData.id)
+
+      setCurrentStep('CANCELLED')
+      setShowPaymentDialog(false)
+      setShowCancelDialog(false)
+
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current)
+      }
+
+      setTimeout(() => {
+        clearCart()
+      }, 2000)
+    } catch (error: any) {
+      setErrorMessage(error?.response?.data?.message || 'Error al cancelar la orden')
+    }
+  }
+
+  const handleOrderExpired = async () => {
+    if (orderData) {
+      try {
+        await cancelOrderMutation.mutateAsync(orderData.id)
+      } catch (error) {
+        console.error('Error auto-cancelling expired order:', error)
+      }
+    }
+
+    setCurrentStep('CANCELLED')
+    setShowPaymentDialog(false)
+    setErrorMessage('El tiempo de reserva ha expirado. La orden ha sido cancelada automáticamente.')
+
+    setTimeout(() => {
+      clearCart()
+    }, 3000)
+  }
+
+  const handleClosePaymentDialog = () => {
+    if (orderData && currentStep === 'ORDER_CREATED') {
+      setShowCancelDialog(true)
+    } else {
+      setShowPaymentDialog(false)
     }
   }
 
@@ -395,7 +504,8 @@ const PointOfSale: React.FC = () => {
     addToCartMutation.isPending ||
     repriceMutation.isPending ||
     createOrderMutation.isPending ||
-    confirmOrderMutation.isPending
+    confirmOrderMutation.isPending ||
+    cancelOrderMutation.isPending
 
   const handleCatalogScroll = useCallback(
     (e: React.UIEvent<HTMLDivElement>) => {
@@ -408,6 +518,8 @@ const PointOfSale: React.FC = () => {
     },
     [hasNextPage, isFetchingNextPage, fetchNextPage]
   )
+
+  const timerProgress = orderExpiresAt ? (timeRemaining / (15 * 60)) * 100 : 100
 
   return (
     <StyledContainer>
@@ -453,6 +565,21 @@ const PointOfSale: React.FC = () => {
             }
           >
             ✅ ¡Venta completada exitosamente! Orden #{orderData?.id}
+          </Alert>
+        </Box>
+      )}
+
+      {currentStep === 'CANCELLED' && (
+        <Box sx={{ px: 3, pt: 2 }}>
+          <Alert
+            severity='warning'
+            action={
+              <Button color='inherit' size='small' onClick={clearCart}>
+                Nueva Venta
+              </Button>
+            }
+          >
+            ⚠️ Orden #{orderData?.id} cancelada. El stock ha sido liberado.
           </Alert>
         </Box>
       )}
@@ -766,16 +893,34 @@ const PointOfSale: React.FC = () => {
                   )}
                 </Box>
 
-                {cartItems.length > 0 && repriceData && (
+                {cartItems.length > 0 && (
                   <StyledTotalSection elevation={0}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <Typography variant='h6' fontWeight='bold'>
                         Total:
                       </Typography>
                       <Typography variant='h6' fontWeight='bold' color='primary'>
-                        {formatCurrency(localTotals.total)}
+                        {repriceData
+                          ? `Bs ${localTotals.total.toFixed(2)}`
+                          : `Bs ${cartItems
+                              .reduce((sum, item) => {
+                                const variantInfo = item.variantInfo
+                                const price = variantInfo?.price || 0
+
+                                return sum + price * item.quantity
+                              }, 0)
+                              .toFixed(2)}`}
                       </Typography>
                     </Box>
+                    {!repriceData && (
+                      <Typography
+                        variant='caption'
+                        color='text.secondary'
+                        sx={{ display: 'block', mt: 0.5, textAlign: 'right' }}
+                      >
+                        *Estimado (sujeto a verificación)
+                      </Typography>
+                    )}
                   </StyledTotalSection>
                 )}
 
@@ -793,7 +938,7 @@ const PointOfSale: React.FC = () => {
                   </Button>
                 )}
 
-                {currentStep !== 'BUILDING_CART' && currentStep !== 'COMPLETED' && (
+                {currentStep !== 'BUILDING_CART' && currentStep !== 'COMPLETED' && currentStep !== 'CANCELLED' && (
                   <Alert severity='info' sx={{ mt: 1 }}>
                     {currentStep === 'VERIFYING_STOCK' && 'Verificando disponibilidad...'}
                     {currentStep === 'ORDER_CREATED' && 'Orden creada, seleccione método de pago'}
@@ -808,16 +953,42 @@ const PointOfSale: React.FC = () => {
 
       <Dialog
         open={showPaymentDialog}
-        onClose={() => !isLoading && setShowPaymentDialog(false)}
+        onClose={handleClosePaymentDialog}
         maxWidth='sm'
         fullWidth
+        disableEscapeKeyDown={currentStep === 'ORDER_CREATED'}
       >
         <DialogTitle>
           <Typography variant='h6'>Método de Pago - Orden #{orderData?.id}</Typography>
         </DialogTitle>
         <DialogContent>
+          {orderExpiresAt && timeRemaining > 0 && (
+            <TimerBox elevation={0}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                <Typography variant='body2' fontWeight='bold' color='warning.main'>
+                  ⏱️ Tiempo restante: {formatTime(timeRemaining)}
+                </Typography>
+                <Typography variant='caption' color='text.secondary'>
+                  {timeRemaining < 60 ? '¡Apúrate!' : 'Stock reservado'}
+                </Typography>
+              </Box>
+              <LinearProgress
+                variant='determinate'
+                value={timerProgress}
+                sx={{
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: 'rgba(255, 152, 0, 0.2)',
+                  '& .MuiLinearProgress-bar': {
+                    backgroundColor: timeRemaining < 60 ? 'error.main' : 'warning.main'
+                  }
+                }}
+              />
+            </TimerBox>
+          )}
+
           <Typography variant='h5' gutterBottom color='primary' fontWeight='bold'>
-            Total a pagar: {orderData ? formatCurrency(orderData.totalPrice) : '$0'}
+            Total a pagar: {orderData ? formatCurrency(orderData.totalPrice) : 'BS 0'}
           </Typography>
 
           <Grid container spacing={2} sx={{ mt: 1 }}>
@@ -866,17 +1037,46 @@ const PointOfSale: React.FC = () => {
             </Box>
           )}
         </DialogContent>
-        <DialogActions sx={{ p: 3 }}>
-          <Button onClick={() => setShowPaymentDialog(false)} disabled={isLoading}>
-            Cancelar
+        <DialogActions sx={{ p: 3, justifyContent: 'space-between' }}>
+          <Button
+            onClick={() => setShowCancelDialog(true)}
+            color='error'
+            variant='outlined'
+            disabled={isLoading || currentStep === 'PAYMENT'}
+          >
+            Cancelar Orden
           </Button>
           <Button
             variant='contained'
             onClick={confirmPayment}
-            disabled={!selectedPayment || isLoading}
+            disabled={!selectedPayment || isLoading || timeRemaining === 0}
             startIcon={isLoading ? <CircularProgress size={20} color='inherit' /> : <span>💳</span>}
           >
             {isLoading ? 'Procesando...' : 'Confirmar Pago'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={showCancelDialog} onClose={() => setShowCancelDialog(false)} maxWidth='xs' fullWidth>
+        <DialogTitle>¿Cancelar Orden?</DialogTitle>
+        <DialogContent>
+          <Typography>
+            ¿Estás seguro que deseas cancelar la orden #{orderData?.id}? El stock reservado será liberado
+            inmediatamente.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowCancelDialog(false)} disabled={isLoading}>
+            No, Continuar
+          </Button>
+          <Button
+            onClick={handleCancelOrder}
+            color='error'
+            variant='contained'
+            disabled={isLoading}
+            startIcon={isLoading ? <CircularProgress size={20} color='inherit' /> : null}
+          >
+            {isLoading ? 'Cancelando...' : 'Sí, Cancelar'}
           </Button>
         </DialogActions>
       </Dialog>

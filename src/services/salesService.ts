@@ -8,7 +8,8 @@ import type {
   Order,
   CreateOrderRequest,
   ConfirmOrderRequest,
-  ConfirmOrderResponse
+  ConfirmOrderResponse,
+  CancelOrderResponse
 } from '@/types/api/sales'
 
 class CartServiceClass {
@@ -30,7 +31,8 @@ class CartServiceClass {
   //Crear orden
 
   async createOrder(data: CreateOrderRequest): Promise<Order> {
-    const response = await apiClient.post<Order>('/api/orders/in-store', data)
+    const payload = { items: data.token }
+    const response = await apiClient.post<Order>('/api/orders/in-store', payload)
 
     return response.data
   }
@@ -39,6 +41,12 @@ class CartServiceClass {
 
   async confirmOrder(orderId: number, data: ConfirmOrderRequest): Promise<ConfirmOrderResponse> {
     const response = await apiClient.post<ConfirmOrderResponse>(`/api/orders/confirm/${orderId}`, data)
+
+    return response.data
+  }
+
+  async cancelOrder(orderId: number): Promise<CancelOrderResponse> {
+    const response = await apiClient.post<CancelOrderResponse>(`/api/orders/cancel/${orderId}`)
 
     return response.data
   }

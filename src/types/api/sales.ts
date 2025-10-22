@@ -1,4 +1,3 @@
-
 export interface CartItem {
   variantId: number
   quantity: number
@@ -70,5 +69,13 @@ export interface ConfirmOrderRequest {
 export interface ConfirmOrderResponse {
   success: boolean
   orderId: number
+  message: string
+}
+export interface CancelOrderRequest {
+  orderId: number
+}
+
+export interface CancelOrderResponse {
+  success: boolean
   message: string
 }
