@@ -92,6 +92,11 @@ class VariantServiceClass {
 
     return response.data
   }
+  async deleteMultimedia(urls: string[]): Promise<void> {
+    await apiClient.delete('/api/multimedia', {
+      data: urls
+    })
+  }
 
   async getAllVariants(
     page: number = 1,

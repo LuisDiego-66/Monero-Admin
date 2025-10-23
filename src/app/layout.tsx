@@ -19,8 +19,8 @@ import type { Locale } from '@/configs/i18n'
 import AuthGuard from '@/components/AuthGuard'
 
 export const metadata = {
-  title: 'Zarga 701',
-  description: 'Ecommerce Dashboard - Zarga 701'
+  title: 'Empresa',
+  description: 'Ecommerce Dashboard - Empresa'
 }
 
 const RootLayout = async (props: ChildrenType & { params: Promise<{ lang: Locale }> }) => {

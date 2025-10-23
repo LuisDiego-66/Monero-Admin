@@ -159,7 +159,7 @@ const LoginV2 = ({ mode }: { mode: SystemMode }) => {
           <Logo />
         </Link>
         <div className='flex flex-col gap-6 is-full sm:is-auto md:is-full sm:max-is-[400px] md:max-is-[unset] mbs-11 sm:mbs-14 md:mbs-0 relative'>
-          <Logo2 alt='Logo de Zarga' src={logoImage} />
+          <Logo2 alt='Logo' src={logoImage} />
           <div className='flex flex-col gap-1 mt-24'>
             <Typography variant='h4'>{`¡Bienvenido a ${themeConfig.templateName}! 👋🏻`}</Typography>
             <Typography>Inicia sesión en tu cuenta para acceder al sistema de administración.</Typography>

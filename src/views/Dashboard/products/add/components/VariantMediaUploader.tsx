@@ -13,9 +13,10 @@ type Props = {
   onFilesChange: (files: MediaFile[]) => void
   error?: string | null
   onErrorChange: (error: string | null) => void
+  onDeleteExisting?: (url: string) => void
 }
 
-const VariantMediaUploader = ({ mediaFiles, onFilesChange, error, onErrorChange }: Props) => {
+const VariantMediaUploader = ({ mediaFiles, onFilesChange, error, onErrorChange, onDeleteExisting }: Props) => {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isDragging, setIsDragging] = useState(false)
 
@@ -103,8 +104,14 @@ const VariantMediaUploader = ({ mediaFiles, onFilesChange, error, onErrorChange 
   const handleRemoveFile = (id: string) => {
     const fileToRemove = mediaFiles.find(f => f.id === id)
 
-    if (fileToRemove && fileToRemove.file) {
-      URL.revokeObjectURL(fileToRemove.url)
+    if (fileToRemove) {
+      if (fileToRemove.source === 'existing' && onDeleteExisting) {
+        onDeleteExisting(fileToRemove.url)
+      }
+
+      if (fileToRemove.source === 'new' && fileToRemove.file) {
+        URL.revokeObjectURL(fileToRemove.url)
+      }
     }
 
     onFilesChange(mediaFiles.filter(f => f.id !== id))

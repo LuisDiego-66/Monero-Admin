@@ -155,3 +155,20 @@ export const useInfiniteVariants = (limit: number = 6, search: string = '') => {
     staleTime: 30000
   })
 }
+
+export const useDeleteMultimedia = () => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (urls: string[]) => variantService.deleteMultimedia(urls),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['variant'],
+        refetchType: 'active'
+      })
+    },
+    onError: error => {
+      console.error('Error deleting multimedia:', error)
+    }
+  })
+}

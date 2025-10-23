@@ -85,3 +85,11 @@ export type AddStockResponse = {
     id: number
   }
 }
+export interface MediaFile {
+  id: string
+  url: string
+  type: 'image' | 'video' | 'document'
+  name: string
+  source: 'new' | 'existing'
+  file?: File
+}

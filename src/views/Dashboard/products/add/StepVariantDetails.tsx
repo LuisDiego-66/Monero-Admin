@@ -33,7 +33,8 @@ import {
   useVariantsByProduct,
   useUpdateVariant,
   useVariantById,
-  useColorById
+  useColorById,
+  useDeleteMultimedia
 } from '@/hooks/useVariants'
 import type { Color, Variant } from '@/types/api/variants'
 import { variantFormSchema, newColorSchema } from '@/schemas/variant.schema'
@@ -90,7 +91,7 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
 
   const createVariant = useCreateVariant()
   const updateVariant = useUpdateVariant()
-
+  const deleteMultimedia = useDeleteMultimedia()
   const isCreateMode = mode === 'create'
 
   const detectFileType = (url: string): 'image' | 'video' | 'document' => {
@@ -357,6 +358,20 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
     }
   }
 
+  const handleDeleteExistingFile = async (url: string) => {
+    try {
+      await deleteMultimedia.mutateAsync([url])
+      toast.success('Archivo eliminado ')
+
+      setVariantForm(prev => ({
+        ...prev,
+        mediaFiles: prev.mediaFiles.filter(file => file.url !== url)
+      }))
+    } catch (error) {
+      toast.error('Error al eliminar el archivo')
+    }
+  }
+
   useEffect(() => {
     return () => {
       variantForm.mediaFiles.forEach(file => {
@@ -500,6 +515,7 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
               onFilesChange={files => setVariantForm(prev => ({ ...prev, mediaFiles: files }))}
               error={filesError}
               onErrorChange={setFilesError}
+              onDeleteExisting={handleDeleteExistingFile}
             />
 
             <Box sx={{ mb: 3 }}>
