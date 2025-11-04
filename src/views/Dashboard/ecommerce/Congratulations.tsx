@@ -5,32 +5,32 @@ import Typography from '@mui/material/Typography'
 import Button from '@mui/material/Button'
 import Grid from '@mui/material/Grid2'
 
-const CongratulationsJohn = () => {
+const BienvenidaAdmin = () => {
   return (
     <Card>
       <Grid container>
         <Grid size={{ xs: 8 }}>
           <CardContent>
             <Typography variant='h5' className='mbe-0.5'>
-              Congratulations John 🎉
+              ¡Bienvenido de nuevo! 👋
             </Typography>
             <Typography variant='subtitle1' className='mbe-2'>
-              Best seller of the month
+              Panel de Administración
             </Typography>
-            <Typography variant='h4' color='primary.main' className='mbe-1'>
-              $48.9k
+            <Typography variant='body2' color='text.secondary' className='mbe-3'>
+              Gestiona tu tienda y supervisa todas las operaciones desde aquí
             </Typography>
             <Button variant='contained' color='primary'>
-              View Sales
+              Ver Dashboard
             </Button>
           </CardContent>
         </Grid>
         <Grid size={{ xs: 4 }}>
           <div className='relative bs-full is-full'>
             <img
-              alt='Congratulations John'
-              src='/images/illustrations/characters/8.png'
-              className='max-bs-[150px] absolute block-end-0 inline-end-6 max-is-full'
+              alt='Bienvenida Administrador'
+              src='/images/illustrations/auth/logoipsum.png'
+              className='max-bs-[150px] absolute block-end-5 inline-end-6 max-is-full'
             />
           </div>
         </Grid>
@@ -39,4 +39,4 @@ const CongratulationsJohn = () => {
   )
 }
 
-export default CongratulationsJohn
+export default BienvenidaAdmin

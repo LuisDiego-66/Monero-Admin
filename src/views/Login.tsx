@@ -92,8 +92,8 @@ const LoginV2 = ({ mode }: { mode: SystemMode }) => {
   // Vars
   const darkImg = '/images/illustrations/auth/fondo.jpg'
   const lightImg = '/images/illustrations/auth/fondo.jpg'
-  const darkImgL = '/images/illustrations/auth/logo.png'
-  const lightImgL = '/images/illustrations/auth/logo1.png'
+  const darkImgL = '/images/illustrations/auth/logoipsum.png'
+  const lightImgL = '/images/illustrations/auth/logoipsum.png'
 
   // Hooks
 

@@ -39,6 +39,7 @@ export interface OrderItem {
   discountValue: number
   totalPrice: string
   variant: {
+    productColor: any
     id: number
   }
 }
@@ -78,4 +79,41 @@ export interface CancelOrderRequest {
 export interface CancelOrderResponse {
   success: boolean
   message: string
+}
+export interface ProductColor {
+  id: number
+  multimedia: string[]
+  pdfs: string[]
+  product: {
+    id: number
+    name: string
+    description: string
+    price: string
+    enabled: boolean
+  }
+}
+
+export interface Variant {
+  id: number
+  productColor: ProductColor
+}
+
+export interface OrdersListParams {
+  page?: number
+  limit?: number
+}
+
+export interface OrdersListMeta {
+  total: number
+  page: number
+  lastPage: number
+  limit: number
+  offset: number
+  hasNextPage: boolean
+  hasPreviousPage: boolean
+}
+
+export interface OrdersListResponse {
+  data: Order[]
+  meta: OrdersListMeta
 }

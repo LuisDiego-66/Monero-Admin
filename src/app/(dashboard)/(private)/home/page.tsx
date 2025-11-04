@@ -4,15 +4,6 @@ import Grid from '@mui/material/Grid2'
 // Components Imports
 import CongratulationsJohn from '@views/Dashboard/ecommerce/Congratulations'
 import StatisticsCard from '@views/Dashboard/ecommerce/StatisticsCard'
-import LineChartProfit from '@views/Dashboard/ecommerce/LineChartProfit'
-import RadialBarChart from '@views/Dashboard/ecommerce/RadialBarChart'
-import DonutChartGeneratedLeads from '@views/Dashboard/ecommerce/DonutChartGeneratedLeads'
-import RevenueReport from '@views/Dashboard/ecommerce/RevenueReport'
-import EarningReports from '@views/Dashboard/ecommerce/EarningReports'
-import PopularProducts from '@views/Dashboard/ecommerce/PopularProducts'
-import Orders from '@views/Dashboard/ecommerce/Orders'
-import Transactions from '@views/Dashboard/ecommerce/Transactions'
-import InvoiceListTable from '@views/Dashboard/ecommerce/InvoiceListTable'
 
 // Data Imports
 import { getInvoiceData } from '@/app/server/actions'
@@ -47,37 +38,6 @@ const EcommerceDashboard = async () => {
       </Grid>
       <Grid size={{ xs: 12, md: 8 }}>
         <StatisticsCard />
-      </Grid>
-      <Grid size={{ xs: 12, xl: 4 }}>
-        <Grid container spacing={6}>
-          <Grid size={{ xs: 12, sm: 6, md: 3, xl: 6 }}>
-            <LineChartProfit />
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 3, xl: 6 }}>
-            <RadialBarChart />
-          </Grid>
-          <Grid size={{ xs: 12, md: 6, xl: 12 }}>
-            <DonutChartGeneratedLeads />
-          </Grid>
-        </Grid>
-      </Grid>
-      <Grid size={{ xs: 12, xl: 8 }}>
-        <RevenueReport />
-      </Grid>
-      <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-        <EarningReports />
-      </Grid>
-      <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-        <PopularProducts />
-      </Grid>
-      <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-        <Orders />
-      </Grid>
-      <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-        <Transactions />
-      </Grid>
-      <Grid size={{ xs: 12, lg: 8 }}>
-        <InvoiceListTable invoiceData={invoiceData} />
       </Grid>
     </Grid>
   )

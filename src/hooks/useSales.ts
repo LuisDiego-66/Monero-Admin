@@ -1,7 +1,7 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 
 import { cartService } from '@/services/salesService'
-import type { CartRequest, CreateOrderRequest, ConfirmOrderRequest } from '@/types/api/sales'
+import type { CartRequest, CreateOrderRequest, ConfirmOrderRequest, OrdersListParams } from '@/types/api/sales'
 
 export const useAddToCart = () => {
   return useMutation({
@@ -50,5 +50,14 @@ export const useCancelOrder = () => {
       console.error('Error cancelling order:', error)
       throw error
     }
+  })
+}
+
+export const useOrders = (params: OrdersListParams) => {
+  return useQuery({
+    queryKey: ['orders', params],
+    queryFn: () => cartService.getOrders(params),
+    staleTime: 30000,
+    refetchOnWindowFocus: true
   })
 }

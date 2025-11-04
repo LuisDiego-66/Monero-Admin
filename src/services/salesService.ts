@@ -9,7 +9,9 @@ import type {
   CreateOrderRequest,
   ConfirmOrderRequest,
   ConfirmOrderResponse,
-  CancelOrderResponse
+  CancelOrderResponse,
+  OrdersListParams,
+  OrdersListResponse
 } from '@/types/api/sales'
 
 class CartServiceClass {
@@ -47,6 +49,11 @@ class CartServiceClass {
 
   async cancelOrder(orderId: number): Promise<CancelOrderResponse> {
     const response = await apiClient.post<CancelOrderResponse>(`/api/orders/cancel/${orderId}`)
+
+    return response.data
+  }
+  async getOrders(params: OrdersListParams): Promise<OrdersListResponse> {
+    const response = await apiClient.get<OrdersListResponse>('/api/orders', { params })
 
     return response.data
   }

@@ -21,38 +21,38 @@ type DataType = {
 const data: DataType[] = [
   {
     stats: '230k',
-    title: 'Sales',
+    title: 'Ventas',
     color: 'primary',
     icon: 'tabler-chart-pie-2'
   },
   {
     color: 'info',
     stats: '8.549k',
-    title: 'Customers',
+    title: 'Clientes',
     icon: 'tabler-users'
   },
   {
     color: 'error',
     stats: '1.423k',
-    title: 'Products',
+    title: 'Productos',
     icon: 'tabler-shopping-cart'
   },
   {
-    stats: '$9745',
+    stats: '$9.745',
     color: 'success',
-    title: 'Revenue',
+    title: 'Ingresos',
     icon: 'tabler-currency-dollar'
   }
 ]
 
-const StatisticsCard = () => {
+const TarjetaEstadisticas = () => {
   return (
     <Card>
       <CardHeader
-        title='Statistics'
+        title='Estadísticas'
         action={
           <Typography variant='subtitle2' color='text.disabled'>
-            Updated 1 month ago
+            Actualizado hace 1 mes
           </Typography>
         }
       />
@@ -75,4 +75,4 @@ const StatisticsCard = () => {
   )
 }
 
-export default StatisticsCard
+export default TarjetaEstadisticas
