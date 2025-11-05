@@ -108,6 +108,23 @@ const verticalMenuData = (): VerticalMenuDataType[] => [
     ]
   },
 
+  // MÓDULO OUTFITS
+  {
+    isSection: true,
+    label: 'MÓDULO OUTFITS'
+  },
+  {
+    label: 'Outfits',
+    icon: 'tabler-shirt',
+    children: [
+      {
+        label: 'Lista de Outfits',
+        icon: 'tabler-list',
+        href: '/outfits/list/'
+      }
+    ]
+  },
+
   // MÓDULO SLIDERS
   {
     isSection: true,
