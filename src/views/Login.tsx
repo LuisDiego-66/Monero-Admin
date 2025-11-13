@@ -48,7 +48,7 @@ const MaskImg = styled('img')(({ theme }) => ({
   }
 }))
 
-const Logo2 = styled('img')(({ theme }) => ({
+const Logo2 = styled('img')<{ mode: SystemMode }>(({ theme, mode }) => ({
   width: '200px',
   height: 'auto',
   position: 'absolute',
@@ -57,12 +57,13 @@ const Logo2 = styled('img')(({ theme }) => ({
   transform: 'translate(-50%, -50%)',
   objectFit: 'contain',
   transition: 'all 0.3s ease',
+  filter: mode === 'dark' ? 'drop-shadow(0 0 8px white)' : 'none', // contorno blanco suave solo en modo oscuro
   [theme.breakpoints.down(1200)]: {
-    width: '350px',
+    width: '220px',
     top: '-1%'
   },
   [theme.breakpoints.down(900)]: {
-    width: '320px',
+    width: '220px',
     top: '-1%'
   },
   '@media (max-height: 768px)': {
@@ -74,10 +75,11 @@ const Logo2 = styled('img')(({ theme }) => ({
     top: '2%'
   },
   [theme.breakpoints.down('sm')]: {
-    width: '320px',
+    width: '190px',
     top: '2%'
   }
-}))
+}));
+
 
 const LoginV2 = ({ mode }: { mode: SystemMode }) => {
   // States
@@ -92,8 +94,8 @@ const LoginV2 = ({ mode }: { mode: SystemMode }) => {
   // Vars
   const darkImg = '/images/illustrations/auth/fondo.jpg'
   const lightImg = '/images/illustrations/auth/fondo.jpg'
-  const darkImgL = '/images/illustrations/auth/logoipsum.png'
-  const lightImgL = '/images/illustrations/auth/logoipsum.png'
+  const darkImgL = '/images/illustrations/auth/LogoMonero.png'
+  const lightImgL = '/images/illustrations/auth/LogoMonero.png'
 
   // Hooks
 
@@ -159,7 +161,8 @@ const LoginV2 = ({ mode }: { mode: SystemMode }) => {
           <Logo />
         </Link>
         <div className='flex flex-col gap-6 is-full sm:is-auto md:is-full sm:max-is-[400px] md:max-is-[unset] mbs-11 sm:mbs-14 md:mbs-0 relative'>
-          <Logo2 alt='Logo' src={logoImage} />
+          <Logo2 alt='Logo' src={logoImage} mode={mode} />
+
           <div className='flex flex-col gap-1 mt-24'>
             <Typography variant='h4'>{`¡Bienvenido a ${themeConfig.templateName}! 👋🏻`}</Typography>
             <Typography>Inicia sesión en tu cuenta para acceder al sistema de administración.</Typography>
@@ -207,21 +210,7 @@ const LoginV2 = ({ mode }: { mode: SystemMode }) => {
                 )
               }}
             />
-            <div className='flex justify-between items-center gap-x-3 gap-y-1 flex-wrap'>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={rememberMe}
-                    onChange={e => setRememberMe(e.target.checked)}
-                    disabled={isLoggingIn}
-                  />
-                }
-                label='Recordarme'
-              />
-              <Typography className='text-end' color='primary.main' component={Link}>
-                ¿Olvidaste tu contraseña?
-              </Typography>
-            </div>
+            
             <Button fullWidth variant='contained' type='submit' disabled={isLoggingIn || !isFormValid} size='large'>
               {isLoggingIn ? 'Iniciando sesión...' : 'Iniciar sesión'}
             </Button>
@@ -232,17 +221,9 @@ const LoginV2 = ({ mode }: { mode: SystemMode }) => {
               </Typography>
             </div>
             <Divider className='gap-2 text-textPrimary'>o</Divider>
-            <div className='flex justify-center items-center gap-1.5'>
-              <IconButton className='text-facebook' size='small' disabled={isLoggingIn}>
-                <i className='tabler-brand-facebook-filled' />
-              </IconButton>
-              <IconButton className='text-twitter' size='small' disabled={isLoggingIn}>
-                <i className='tabler-brand-twitter-filled' />
-              </IconButton>
-              <IconButton className='text-error' size='small' disabled={isLoggingIn}>
-                <i className='tabler-brand-google-filled' />
-              </IconButton>
-            </div>
+            <div className='flex justify-center items-center gap-2 text-sm text-gray-500 text-center'>
+  El uso de este panel es responsabilidad del administrador. Asegúrese de seguir las políticas de seguridad y privacidad.
+</div>
           </form>
         </div>
       </div>

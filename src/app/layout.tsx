@@ -19,8 +19,8 @@ import type { Locale } from '@/configs/i18n'
 import AuthGuard from '@/components/AuthGuard'
 
 export const metadata = {
-  title: 'Empresa',
-  description: 'Ecommerce Dashboard - Empresa'
+  title: 'Monero Admin',
+  description: 'Administrador - Monero'
 }
 
 const RootLayout = async (props: ChildrenType & { params: Promise<{ lang: Locale }> }) => {

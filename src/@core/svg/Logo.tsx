@@ -9,8 +9,8 @@ interface LogoProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 'src'> {
 }
 
 const Logo = ({
-  lightSrc = '/images/illustrations/auth/logo2.png',
-  darkSrc = '/images/illustrations/auth/logo3.png',
+  lightSrc = '/images/illustrations/auth/LogoMonero1.png',
+  darkSrc = '/images/illustrations/auth/LogoMonero1.png',
   ...props
 }: LogoProps) => {
   const theme = useTheme()
@@ -20,7 +20,7 @@ const Logo = ({
     <img
       src={isDarkMode ? darkSrc : lightSrc}
       width={50}
-      height={34}
+      height={50}
       alt='Logo'
       style={{
         objectFit: 'contain',
