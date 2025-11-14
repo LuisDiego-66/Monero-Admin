@@ -135,19 +135,9 @@ const verticalMenuData = (): VerticalMenuDataType[] => [
     icon: 'tabler-photo',
     children: [
       {
-        label: 'Crear Sliders',
+        label: 'Crear/Listar Sliders',
         icon: 'tabler-plus',
-        href: '/sliders/crear'
-      },
-      {
-        label: 'Listar Sliders',
-        icon: 'tabler-list',
-        href: '/sliders/listar'
-      },
-      {
-        label: 'Anuncios',
-        icon: 'tabler-speakerphone',
-        href: '/sliders/anuncios'
+        href: '/sliders/list/'
       }
     ]
   }
