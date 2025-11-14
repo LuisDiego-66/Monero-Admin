@@ -28,7 +28,6 @@ const ProductQRModal = ({ open, onClose, productId, productName }: ProductQRModa
 
     if (!svg) return
 
-    // Crear un canvas para convertir SVG a imagen
     const canvas = document.createElement('canvas')
     const ctx = canvas.getContext('2d')
 
@@ -37,16 +36,13 @@ const ProductQRModal = ({ open, onClose, productId, productName }: ProductQRModa
     const svgData = new XMLSerializer().serializeToString(svg)
     const img = new Image()
 
-    // Configurar tamaño del canvas
     canvas.width = 512
     canvas.height = 512
 
     img.onload = () => {
-      // Fondo blanco
       ctx.fillStyle = 'white'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-      // Dibujar QR
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
 
       // Descargar como PNG
@@ -93,9 +89,6 @@ const ProductQRModal = ({ open, onClose, productId, productName }: ProductQRModa
           </Box>
 
           <Box sx={{ textAlign: 'center' }}>
-            <Typography variant='body2' color='text.secondary' sx={{ fontFamily: 'monospace' }}>
-              {qrValue}
-            </Typography>
             <Typography variant='caption' color='text.secondary' sx={{ mt: 1, display: 'block' }}>
               ID del Producto: {productId}
             </Typography>
@@ -106,7 +99,12 @@ const ProductQRModal = ({ open, onClose, productId, productName }: ProductQRModa
         <Button onClick={onClose} color='secondary'>
           Cerrar
         </Button>
-        <Button onClick={handleDownloadQR} color='primary' variant='contained' startIcon={<i className='tabler-download' />}>
+        <Button
+          onClick={handleDownloadQR}
+          color='primary'
+          variant='contained'
+          startIcon={<i className='tabler-download' />}
+        >
           Descargar QR
         </Button>
       </DialogActions>
