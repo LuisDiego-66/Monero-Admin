@@ -57,7 +57,7 @@ const Logo2 = styled('img')<{ mode: SystemMode }>(({ theme, mode }) => ({
   transform: 'translate(-50%, -50%)',
   objectFit: 'contain',
   transition: 'all 0.3s ease',
-  filter: mode === 'dark' ? 'drop-shadow(0 0 8px white)' : 'none', // contorno blanco suave solo en modo oscuro
+  filter: mode === 'dark' ? 'drop-shadow(0 0 8px white)' : 'none',
   [theme.breakpoints.down(1200)]: {
     width: '220px',
     top: '-1%'
@@ -78,17 +78,14 @@ const Logo2 = styled('img')<{ mode: SystemMode }>(({ theme, mode }) => ({
     width: '190px',
     top: '2%'
   }
-}));
-
+}))
 
 const LoginV2 = ({ mode }: { mode: SystemMode }) => {
-  // States
   const [isPasswordShown, setIsPasswordShown] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [rememberMe, setRememberMe] = useState(false)
 
-  // Hook de autenticación
   const { login, isLoggingIn, loginError } = useAuth()
 
   // Vars
@@ -210,7 +207,7 @@ const LoginV2 = ({ mode }: { mode: SystemMode }) => {
                 )
               }}
             />
-            
+
             <Button fullWidth variant='contained' type='submit' disabled={isLoggingIn || !isFormValid} size='large'>
               {isLoggingIn ? 'Iniciando sesión...' : 'Iniciar sesión'}
             </Button>
@@ -222,8 +219,9 @@ const LoginV2 = ({ mode }: { mode: SystemMode }) => {
             </div>
             <Divider className='gap-2 text-textPrimary'>o</Divider>
             <div className='flex justify-center items-center gap-2 text-sm text-gray-500 text-center'>
-  El uso de este panel es responsabilidad del administrador. Asegúrese de seguir las políticas de seguridad y privacidad.
-</div>
+              El uso de este panel es responsabilidad del administrador. Asegúrese de seguir las políticas de seguridad
+              y privacidad.
+            </div>
           </form>
         </div>
       </div>

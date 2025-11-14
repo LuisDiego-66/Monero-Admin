@@ -5,12 +5,8 @@ export const sliderFormSchema = z.object({
   image: z.string().url('Debe ser una URL válida'),
   button_text: z.string().min(1, 'El texto del botón es requerido'),
   url: z.string().url('Debe ser una URL válida').or(z.literal('')).optional(),
-  slider_type: z.enum(['mobile', 'desktop'], {
-    required_error: 'Debe seleccionar un tipo de slider'
-  }),
-  gender: z.enum(['male', 'female'], {
-    required_error: 'Debe seleccionar un género'
-  })
+  slider_type: z.enum(['mobile', 'desktop']),
+  gender: z.enum(['male', 'female'])
 })
 
 export type SliderFormData = z.infer<typeof sliderFormSchema>
