@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import Card from '@mui/material/Card'
@@ -10,8 +12,10 @@ import TableContainer from '@mui/material/TableContainer'
 import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
 import CircularProgress from '@mui/material/CircularProgress'
+import IconButton from '@mui/material/IconButton'
 
 import type { Variant } from '@/types/api/variants'
+import VariantQRModal from './VariantQRModal'
 
 type Props = {
   variants: Variant[]
@@ -21,6 +25,25 @@ type Props = {
 }
 
 const VariantsList = ({ variants, isLoading, editingVariantId, onVariantClick }: Props) => {
+  const [qrModalOpen, setQrModalOpen] = useState(false)
+
+  const [selectedVariant, setSelectedVariant] = useState<{
+    id: number
+    colorName: string
+    sizeName: string
+  } | null>(null)
+
+  const handleOpenQR = (e: React.MouseEvent, variantSizeId: number, colorName: string, sizeName: string) => {
+    e.stopPropagation()
+    setSelectedVariant({ id: variantSizeId, colorName, sizeName })
+    setQrModalOpen(true)
+  }
+
+  const handleCloseQR = () => {
+    setQrModalOpen(false)
+    setSelectedVariant(null)
+  }
+
   return (
     <Card sx={{ height: 'fit-content', position: 'sticky', top: 20 }}>
       <CardHeader
@@ -42,80 +65,119 @@ const VariantsList = ({ variants, isLoading, editingVariantId, onVariantClick }:
               <TableHead>
                 <TableRow>
                   <TableCell>Color</TableCell>
-                  <TableCell>Tallas</TableCell>
+                  <TableCell>Talla</TableCell>
+                  <TableCell>Stock</TableCell>
                   <TableCell>Imagen</TableCell>
+                  <TableCell align='center'>QR</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {variants.map(variant => (
-                  <TableRow
-                    key={variant.id}
-                    hover
-                    sx={{
-                      cursor: 'pointer',
-                      backgroundColor: editingVariantId === Number(variant.id) ? 'action.selected' : 'transparent'
-                    }}
-                    onClick={() => onVariantClick(variant)}
-                  >
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <Box
-                          sx={{
-                            width: 20,
-                            height: 20,
-                            borderRadius: '50%',
-                            backgroundColor: variant.color?.code || variant.colorCode,
-                            border: '1px solid #ddd'
-                          }}
-                        />
-                        <Typography variant='caption'>{variant.color?.name || variant.colorName}</Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant='caption'>
-                        {variant.variants
-                          .map(s => (typeof s.size === 'object' ? (s.size as any).name : s.size))
-                          .join(', ')}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <div className='flex items-center gap-1'>
-                        {variant.multimedia
-                          .filter(url => {
-                            const ext = url.split('.').pop()?.toLowerCase() || ''
+                {variants.map(variant => {
+                  const colorName = variant.color?.name || variant.colorName || ''
+                  const colorCode = variant.color?.code || variant.colorCode || '#000'
 
-                            return ['jpg', 'jpeg', 'png'].includes(ext)
-                          })
-                          .slice(0, 3)
-                          .map((url, idx) => (
-                            <Box
-                              key={idx}
-                              sx={{
-                                width: 24,
-                                height: 24,
-                                borderRadius: 0.5,
-                                overflow: 'hidden',
-                                border: '1px solid',
-                                borderColor: 'divider'
-                              }}
-                            >
-                              <img src={url} alt='' style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  return variant.variants.map((variantSize, sizeIndex) => {
+                    const sizeName =
+                      typeof variantSize.size === 'object' ? (variantSize.size as any).name : variantSize.size
+
+                    const sizeId = variantSize.id
+
+                    return (
+                      <TableRow
+                        key={`${variant.id}-${sizeId || sizeIndex}`}
+                        hover
+                        sx={{
+                          cursor: 'pointer',
+                          backgroundColor:
+                            editingVariantId === Number(variant.id) ? 'action.selected' : 'transparent'
+                        }}
+                        onClick={() => onVariantClick(variant)}
+                      >
+                        {sizeIndex === 0 ? (
+                          <TableCell rowSpan={variant.variants.length}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <Box
+                                sx={{
+                                  width: 20,
+                                  height: 20,
+                                  borderRadius: '50%',
+                                  backgroundColor: colorCode,
+                                  border: '1px solid #ddd'
+                                }}
+                              />
+                              <Typography variant='caption'>{colorName}</Typography>
                             </Box>
-                          ))}
-                        {variant.multimedia.length > 3 && (
-                          <Typography variant='caption' sx={{ fontSize: '10px', color: 'text.secondary' }}>
-                            +{variant.multimedia.length - 3}
+                          </TableCell>
+                        ) : null}
+
+                        <TableCell>
+                          <Typography variant='caption'>{sizeName}</Typography>
+                        </TableCell>
+
+                        <TableCell>
+                          <Typography variant='caption'>
+                            {variantSize.availableStock !== undefined ? variantSize.availableStock : '-'}
                           </Typography>
-                        )}
-                        {variant.multimedia.length === 0 && (
-                          <Typography variant='caption' color='text.secondary'>
-                            Sin imagen
-                          </Typography>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                        </TableCell>
+
+                        {sizeIndex === 0 ? (
+                          <TableCell rowSpan={variant.variants.length}>
+                            <div className='flex items-center gap-1'>
+                              {variant.multimedia
+                                .filter(url => {
+                                  const ext = url.split('.').pop()?.toLowerCase() || ''
+
+                                  return ['jpg', 'jpeg', 'png'].includes(ext)
+                                })
+                                .slice(0, 3)
+                                .map((url, idx) => (
+                                  <Box
+                                    key={idx}
+                                    sx={{
+                                      width: 24,
+                                      height: 24,
+                                      borderRadius: 0.5,
+                                      overflow: 'hidden',
+                                      border: '1px solid',
+                                      borderColor: 'divider'
+                                    }}
+                                  >
+                                    <img src={url} alt='' style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                  </Box>
+                                ))}
+                              {variant.multimedia.length > 3 && (
+                                <Typography variant='caption' sx={{ fontSize: '10px', color: 'text.secondary' }}>
+                                  +{variant.multimedia.length - 3}
+                                </Typography>
+                              )}
+                              {variant.multimedia.length === 0 && (
+                                <Typography variant='caption' color='text.secondary'>
+                                  Sin imagen
+                                </Typography>
+                              )}
+                            </div>
+                          </TableCell>
+                        ) : null}
+
+                        <TableCell align='center'>
+                          {sizeId ? (
+                            <IconButton
+                              size='small'
+                              color='primary'
+                              onClick={e => handleOpenQR(e, Number(sizeId), colorName, sizeName)}
+                            >
+                              <i className='tabler-qrcode' />
+                            </IconButton>
+                          ) : (
+                            <Typography variant='caption' color='text.disabled'>
+                              N/A
+                            </Typography>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
+                })}
               </TableBody>
             </Table>
           </TableContainer>
@@ -129,6 +191,16 @@ const VariantsList = ({ variants, isLoading, editingVariantId, onVariantClick }:
           </Box>
         )}
       </CardContent>
+
+      {selectedVariant && (
+        <VariantQRModal
+          open={qrModalOpen}
+          onClose={handleCloseQR}
+          variantId={selectedVariant.id}
+          colorName={selectedVariant.colorName}
+          sizeName={selectedVariant.sizeName}
+        />
+      )}
     </Card>
   )
 }

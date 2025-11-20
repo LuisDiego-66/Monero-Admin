@@ -40,7 +40,6 @@ import type { RankingInfo } from '@tanstack/match-sorter-utils'
 import CustomTextField from '@core/components/mui/TextField'
 import { useProducts, useDeleteProduct } from '@/hooks/useProducts'
 import tableStyles from '@core/styles/table.module.css'
-import ProductQRModal from '../components/ProductQRModal'
 
 declare module '@tanstack/table-core' {
   interface FilterFns {
@@ -95,8 +94,6 @@ const ProductListTable = () => {
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [productToDelete, setProductToDelete] = useState<number | null>(null)
-  const [qrModalOpen, setQrModalOpen] = useState(false)
-  const [selectedProduct, setSelectedProduct] = useState<{ id: number; name: string } | null>(null)
 
   const queryParams = useMemo(
     () => ({
@@ -146,16 +143,6 @@ const ProductListTable = () => {
   const cancelDelete = useCallback(() => {
     setDeleteDialogOpen(false)
     setProductToDelete(null)
-  }, [])
-
-  const handleOpenQR = useCallback((productId: number, productName: string) => {
-    setSelectedProduct({ id: productId, name: productName })
-    setQrModalOpen(true)
-  }, [])
-
-  const handleCloseQR = useCallback(() => {
-    setQrModalOpen(false)
-    setSelectedProduct(null)
   }, [])
 
   const columns = useMemo<ColumnDef<any, any>[]>(
@@ -234,23 +221,6 @@ const ProductListTable = () => {
         }
       },
       {
-        id: 'qr',
-        header: 'QR',
-        enableSorting: false,
-        cell: ({ row }: any) => (
-          <IconButton
-            size='small'
-            onClick={e => {
-              e.stopPropagation()
-              handleOpenQR(row.original.id, row.original.name)
-            }}
-            color='primary'
-          >
-            <i className='tabler-qrcode' />
-          </IconButton>
-        )
-      },
-      {
         id: 'actions',
         header: 'Acciones',
         enableSorting: false,
@@ -280,7 +250,7 @@ const ProductListTable = () => {
         )
       }
     ],
-    [router, handleDelete, handleOpenQR]
+    [router, handleDelete]
   )
 
   const table = useReactTable({
@@ -458,15 +428,6 @@ const ProductListTable = () => {
           </Button>
         </DialogActions>
       </Dialog>
-
-      {selectedProduct && (
-        <ProductQRModal
-          open={qrModalOpen}
-          onClose={handleCloseQR}
-          productId={selectedProduct.id}
-          productName={selectedProduct.name}
-        />
-      )}
     </Card>
   )
 }
