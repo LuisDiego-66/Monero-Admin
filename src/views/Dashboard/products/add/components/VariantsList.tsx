@@ -66,7 +66,7 @@ const VariantsList = ({ variants, isLoading, editingVariantId, onVariantClick }:
                 <TableRow>
                   <TableCell>Color</TableCell>
                   <TableCell>Talla</TableCell>
-                  <TableCell>Stock</TableCell>
+
                   <TableCell>Imagen</TableCell>
                   <TableCell align='center'>QR</TableCell>
                 </TableRow>
@@ -88,8 +88,7 @@ const VariantsList = ({ variants, isLoading, editingVariantId, onVariantClick }:
                         hover
                         sx={{
                           cursor: 'pointer',
-                          backgroundColor:
-                            editingVariantId === Number(variant.id) ? 'action.selected' : 'transparent'
+                          backgroundColor: editingVariantId === Number(variant.id) ? 'action.selected' : 'transparent'
                         }}
                         onClick={() => onVariantClick(variant)}
                       >
@@ -114,12 +113,6 @@ const VariantsList = ({ variants, isLoading, editingVariantId, onVariantClick }:
                           <Typography variant='caption'>{sizeName}</Typography>
                         </TableCell>
 
-                        <TableCell>
-                          <Typography variant='caption'>
-                            {variantSize.availableStock !== undefined ? variantSize.availableStock : '-'}
-                          </Typography>
-                        </TableCell>
-
                         {sizeIndex === 0 ? (
                           <TableCell rowSpan={variant.variants.length}>
                             <div className='flex items-center gap-1'>
@@ -142,7 +135,11 @@ const VariantsList = ({ variants, isLoading, editingVariantId, onVariantClick }:
                                       borderColor: 'divider'
                                     }}
                                   >
-                                    <img src={url} alt='' style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    <img
+                                      src={url}
+                                      alt=''
+                                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                    />
                                   </Box>
                                 ))}
                               {variant.multimedia.length > 3 && (
