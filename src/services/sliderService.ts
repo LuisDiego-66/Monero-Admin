@@ -21,7 +21,7 @@ class SliderServiceClass {
   }
 
   async updateSlider(id: number, data: UpdateSliderRequest): Promise<Slider> {
-    const response = await apiClient.post<Slider>(`/api/sliders/${id}`, data)
+    const response = await apiClient.patch<Slider>(`/api/sliders/${id}`, data)
 
     return response.data
   }
@@ -33,13 +33,13 @@ class SliderServiceClass {
   async uploadImage(file: File): Promise<{ url: string }> {
     const formData = new FormData()
 
-    formData.append('file', file)
+    formData.append('files', file)
 
-    const response = await apiClient.post<{ url: string }>('/api/multimedia', formData, {
+    const response = await apiClient.post<string[]>('/api/multimedia', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
 
-    return response.data
+    return { url: response.data[0] }
   }
 }
 
