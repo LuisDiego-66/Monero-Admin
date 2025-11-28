@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, useCallback } from 'react'
+import type { SyntheticEvent } from 'react'
 
 import Card from '@mui/material/Card'
 import CardHeader from '@mui/material/CardHeader'
@@ -20,6 +21,8 @@ import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
 import DialogActions from '@mui/material/DialogActions'
 import DialogContentText from '@mui/material/DialogContentText'
+import Snackbar from '@mui/material/Snackbar'
+import TablePagination from '@mui/material/TablePagination'
 import type { TextFieldProps } from '@mui/material/TextField'
 import { styled, useTheme } from '@mui/material/styles'
 import classnames from 'classnames'
@@ -42,7 +45,7 @@ import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } 
 import { CSS } from '@dnd-kit/utilities'
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
 
-import AddCategoryDrawer from './AddCategoryDrawer'
+import CreateEditCategoryModal from './CreateEditCategoryModal'
 import CustomTextField from '@core/components/mui/TextField'
 import { useCategories, useUpdateCategoryOrder, useDeleteCategory } from '@/hooks/useCategory'
 import type { Category, Gender } from '@/types/api/category'
@@ -63,6 +66,12 @@ const StyledAlert = styled(Alert)(({ theme }) => ({
     alignItems: 'center'
   }
 }))
+
+export type SnackbarMessage = {
+  key: number
+  message: string
+  severity: 'success' | 'error' | 'info' | 'warning'
+}
 
 const fuzzyFilter: FilterFn<any> = (row, columnId, value, addMeta) => {
   const itemRank = rankItem(row.getValue(columnId), value)
@@ -180,11 +189,16 @@ const ProductCategoryTable = () => {
   const [genderFilter, setGenderFilter] = useState<Gender | 'all'>('all')
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [categoryToDelete, setCategoryToDelete] = useState<number | null>(null)
+  const [page, setPage] = useState(0)
+  const [rowsPerPage, setRowsPerPage] = useState(10)
+
+  const [open, setOpen] = useState<boolean>(false)
+  const [snackPack, setSnackPack] = useState<SnackbarMessage[]>([])
+  const [messageInfo, setMessageInfo] = useState<SnackbarMessage | undefined>(undefined)
 
   const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor))
   const updateOrder = useUpdateCategoryOrder()
   const deleteCategory = useDeleteCategory()
-  const hasFilters = globalFilter !== '' || genderFilter !== 'all'
 
   const {
     data: categories,
@@ -222,6 +236,48 @@ const ProductCategoryTable = () => {
     setCategoryToDelete(null)
   }, [])
 
+  useEffect(() => {
+    if (snackPack.length && !messageInfo) {
+      setOpen(true)
+      setSnackPack(prev => prev.slice(1))
+      setMessageInfo({ ...snackPack[0] })
+    } else if (snackPack.length && messageInfo && open) {
+      setOpen(false)
+    }
+  }, [snackPack, messageInfo, open])
+
+  const showMessage = useCallback((message: string, severity: 'success' | 'error' | 'info' | 'warning') => {
+    setSnackPack(prev => [...prev, { message, severity, key: new Date().getTime() }])
+  }, [])
+
+  const handleSnackbarClose = (event: Event | SyntheticEvent, reason?: string) => {
+    if (reason === 'clickaway') {
+      return
+    }
+
+    setOpen(false)
+  }
+
+  const handleExited = () => {
+    setMessageInfo(undefined)
+  }
+
+  const handleSuccess = useCallback(
+    (message: string) => {
+      showMessage(message, 'success')
+    },
+    [showMessage]
+  )
+
+  const handleError = useCallback(
+    (message: string) => {
+      showMessage(message, 'error')
+    },
+    [showMessage]
+  )
+
+  const shouldPaginate = genderFilter === 'all' && !globalFilter
+
   const sortedData = useMemo(() => {
     if (!categories || !Array.isArray(categories)) return []
 
@@ -231,7 +287,8 @@ const ProductCategoryTable = () => {
       filtered = filtered.filter((category: any) => category.gender === genderFilter)
     }
 
-    if (globalFilter) {
+    // La búsqueda solo funciona cuando el filtro está en "Todos"
+    if (globalFilter && genderFilter === 'all') {
       filtered = filtered.filter((category: any) => category.name.toLowerCase().includes(globalFilter.toLowerCase()))
     }
 
@@ -241,6 +298,14 @@ const ProductCategoryTable = () => {
       return filtered.sort((a: any, b: any) => a.displayOrder - b.displayOrder)
     }
   }, [categories, globalFilter, genderFilter])
+
+  const paginatedData = useMemo(() => {
+    if (!shouldPaginate) return sortedData
+    const startIndex = page * rowsPerPage
+    const endIndex = startIndex + rowsPerPage
+
+    return sortedData.slice(startIndex, endIndex)
+  }, [sortedData, shouldPaginate, page, rowsPerPage])
 
   const handleDragEnd = useCallback(
     async (event: DragEndEvent) => {
@@ -300,6 +365,31 @@ const ProductCategoryTable = () => {
             <Typography className='font-medium' color='text.primary'>
               {row.original.name}
             </Typography>
+          </Box>
+        )
+      },
+      {
+        accessorKey: 'image',
+        header: 'Imagen',
+        cell: ({ row }: any) => (
+          <Box className='h-full w-full p-3 -m-3'>
+            {row.original.image ? (
+              <Box
+                component='img'
+                src={row.original.image}
+                alt={row.original.name}
+                sx={{
+                  width: 50,
+                  height: 50,
+                  objectFit: 'cover',
+                  borderRadius: 1
+                }}
+              />
+            ) : (
+              <Typography variant='caption' color='text.secondary'>
+                Sin imagen
+              </Typography>
+            )}
           </Box>
         )
       },
@@ -367,14 +457,14 @@ const ProductCategoryTable = () => {
   )
 
   const table = useReactTable({
-    data: sortedData,
+    data: paginatedData,
     columns,
     filterFns: { fuzzy: fuzzyFilter },
     state: {
       globalFilter,
       columnVisibility: {
-        actions: !hasFilters,
-        displayOrder: hasFilters
+        actions: genderFilter === 'all',
+        displayOrder: genderFilter !== 'all'
       }
     },
     enableRowSelection: false,
@@ -546,6 +636,7 @@ const ProductCategoryTable = () => {
             placeholder='Buscar Categoría'
             className='max-sm:is-full'
             size='small'
+            disabled={genderFilter !== 'all'}
           />
           <div className='flex max-sm:flex-col items-start sm:items-center gap-4 max-sm:is-full'>
             <Button
@@ -562,23 +653,50 @@ const ProductCategoryTable = () => {
 
         {tableContent}
 
-        <Box sx={{ py: 2, px: 3, borderTop: 1, borderColor: 'divider' }}>
-          <Typography variant='body2' color='text.secondary'>
-            Mostrando {sortedData.length} categorías en total
-          </Typography>
-        </Box>
+        {shouldPaginate ? (
+          <TablePagination
+            component='div'
+            count={sortedData.length}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={(_, newPage) => {
+              setPage(newPage)
+            }}
+            onRowsPerPageChange={event => {
+              setRowsPerPage(parseInt(event.target.value, 10))
+              setPage(0)
+            }}
+            rowsPerPageOptions={[5, 10, 20, 50]}
+            labelRowsPerPage='Filas por página:'
+            labelDisplayedRows={({ from, to, count }) => `${from}–${to} de ${count}`}
+          />
+        ) : (
+          <Box sx={{ py: 2, px: 3, borderTop: 1, borderColor: 'divider' }}>
+            <Typography variant='body2' color='text.secondary'>
+              Mostrando {sortedData.length} categorías en total
+            </Typography>
+          </Box>
+        )}
       </Card>
 
-      <AddCategoryDrawer open={addCategoryOpen} handleClose={() => setAddCategoryOpen(false)} mode='create' />
+      <CreateEditCategoryModal
+        open={addCategoryOpen}
+        onClose={() => setAddCategoryOpen(false)}
+        mode='create'
+        onSuccess={handleSuccess}
+        onError={handleError}
+      />
 
-      <AddCategoryDrawer
+      <CreateEditCategoryModal
         open={editCategoryOpen}
-        handleClose={() => {
+        onClose={() => {
           setEditCategoryOpen(false)
           setSelectedCategoryId(null)
         }}
         categoryId={selectedCategoryId}
         mode='edit'
+        onSuccess={handleSuccess}
+        onError={handleError}
       />
 
       <Dialog open={deleteDialogOpen} onClose={cancelDelete} maxWidth='xs' fullWidth>
@@ -611,6 +729,24 @@ const ProductCategoryTable = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Snackbar
+        open={open}
+        onClose={handleSnackbarClose}
+        autoHideDuration={3000}
+        TransitionProps={{ onExited: handleExited }}
+        key={messageInfo ? messageInfo.key : undefined}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          variant='filled'
+          onClose={handleSnackbarClose}
+          className='is-full shadow-xs items-center'
+          severity={messageInfo?.severity || 'info'}
+        >
+          {messageInfo?.message}
+        </Alert>
+      </Snackbar>
     </>
   )
 }

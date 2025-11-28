@@ -33,7 +33,9 @@ export const useCategory = (id: number) => {
     queryKey: ['category', id],
     queryFn: () => categoryService.getCategoryById(id),
     enabled: !!id,
-    staleTime: 5 * 60 * 1000
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: 'always'
   })
 }
 
@@ -140,6 +142,7 @@ export const useCreateSubcategory = () => {
       queryClient.invalidateQueries({ queryKey: ['subcategories'] })
       queryClient.invalidateQueries({ queryKey: ['subcategories', 'category', newSubcategory.categoryId] })
       queryClient.invalidateQueries({ queryKey: ['categories'] })
+      queryClient.invalidateQueries({ queryKey: ['category', newSubcategory.categoryId] })
     },
     onError: error => {
       console.error('Error creating subcategory:', error)
@@ -157,6 +160,8 @@ export const useUpdateSubcategory = () => {
       queryClient.invalidateQueries({ queryKey: ['subcategories'] })
       queryClient.invalidateQueries({ queryKey: ['subcategory', updatedSubcategory.id] })
       queryClient.invalidateQueries({ queryKey: ['subcategories', 'category', updatedSubcategory.categoryId] })
+      queryClient.invalidateQueries({ queryKey: ['categories'] })
+      queryClient.invalidateQueries({ queryKey: ['category', updatedSubcategory.categoryId] })
     },
     onError: error => {
       console.error('Error updating subcategory:', error)
@@ -168,14 +173,35 @@ export const useDeleteSubcategory = () => {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (id: number) => categoryService.deleteSubcategory(id),
-    onSuccess: (_, deletedId) => {
+    mutationFn: ({ id, categoryId }: { id: number; categoryId?: number }) => categoryService.deleteSubcategory(id),
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['subcategories'] })
-      queryClient.removeQueries({ queryKey: ['subcategory', deletedId] })
+      queryClient.removeQueries({ queryKey: ['subcategory', variables.id] })
       queryClient.invalidateQueries({ queryKey: ['categories'] })
+
+      if (variables.categoryId) {
+        queryClient.invalidateQueries({ queryKey: ['category', variables.categoryId] })
+      }
     },
     onError: error => {
       console.error('Error deleting subcategory:', error)
+    }
+  })
+}
+
+export const useDeleteMultimedia = () => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (urls: string[]) => categoryService.deleteMultimedia(urls),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['categories'],
+        refetchType: 'active'
+      })
+    },
+    onError: error => {
+      console.error('Error deleting multimedia:', error)
     }
   })
 }

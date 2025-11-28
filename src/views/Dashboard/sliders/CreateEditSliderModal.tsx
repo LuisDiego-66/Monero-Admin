@@ -70,14 +70,16 @@ const CreateEditSliderModal = ({ open, onClose, slider, onSuccess, onError }: Cr
 
   const validateImageFile = useCallback(
     (file: File): boolean => {
-      if (!file.type.startsWith('image/')) {
-        onError('Por favor selecciona un archivo de imagen válido')
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png']
+
+      if (!validTypes.includes(file.type.toLowerCase())) {
+        onError('Solo se permiten imágenes en formato JPG, JPEG o PNG')
 
         return false
       }
 
-      if (file.size > 5 * 1024 * 1024) {
-        onError('La imagen no debe superar los 5MB')
+      if (file.size > 2 * 1024 * 1024) {
+        onError('La imagen no debe superar los 2MB')
 
         return false
       }
@@ -329,7 +331,7 @@ const CreateEditSliderModal = ({ open, onClose, slider, onSuccess, onError }: Cr
                 }
               }}
             >
-              <input type='file' hidden accept='image/*' onChange={handleImageChange} id='slider-image-input' />
+              <input type='file' hidden accept='image/jpeg,image/jpg,image/png' onChange={handleImageChange} id='slider-image-input' />
               <label htmlFor='slider-image-input' style={{ cursor: 'pointer', width: '100%', display: 'block' }}>
                 <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                   <i
@@ -345,7 +347,7 @@ const CreateEditSliderModal = ({ open, onClose, slider, onSuccess, onError }: Cr
                     </Typography>
                   </Box>
                   <Typography variant='caption' color='text.secondary'>
-                    Formatos aceptados: JPG, PNG, WebP. Tamaño máximo: 5MB
+                    Formatos aceptados: JPG, JPEG, PNG. Tamaño máximo: 2MB
                   </Typography>
                 </Box>
               </label>

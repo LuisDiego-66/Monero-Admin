@@ -496,7 +496,7 @@ const OutfitsListTable = () => {
         autoHideDuration={3000}
         TransitionProps={{ onExited: handleExited }}
         key={messageInfo ? messageInfo.key : undefined}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       >
         <Alert
           variant='filled'

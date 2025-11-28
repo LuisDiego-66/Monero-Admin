@@ -4,6 +4,7 @@ export interface Subcategory {
   id: number
   name: string
   enabled: boolean
+  videos?: string[]
   categoryId: number
   displayOrder?: number
   createdAt?: string
@@ -14,6 +15,7 @@ export interface Category {
   id: number
   name: string
   gender: Gender
+  image?: string | null
   displayOrder: number
   enabled: boolean
   subcategories: Subcategory[]
@@ -24,6 +26,7 @@ export interface Category {
 export interface CreateCategoryDto {
   name: string
   gender: Gender
+  image?: string
   displayOrder?: number
   enabled?: boolean
 }
@@ -33,6 +36,7 @@ export interface UpdateCategoryDto extends Partial<CreateCategoryDto> {}
 export interface CreateSubcategoryDto {
   name: string
   enabled?: boolean
+  videos?: string[]
   category: number
 }
 
