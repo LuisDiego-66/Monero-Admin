@@ -339,7 +339,7 @@ const CreateEditCategoryModal = ({
           data: {
             name,
             gender,
-            image: uploadedImageUrl || null
+            image: uploadedImageUrl || undefined
           }
         })
 
@@ -484,7 +484,13 @@ const CreateEditCategoryModal = ({
           </Alert>
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mt: 2 }}>
-            <CustomTextField select fullWidth label='Género' value={gender} onChange={e => setGender(e.target.value as Gender)}>
+            <CustomTextField
+              select
+              fullWidth
+              label='Género'
+              value={gender}
+              onChange={e => setGender(e.target.value as Gender)}
+            >
               <MenuItem value='male'>Hombres</MenuItem>
               <MenuItem value='female'>Mujeres</MenuItem>
             </CustomTextField>
@@ -636,14 +642,14 @@ const CreateEditCategoryModal = ({
                             </IconButton>
                           </Box>
                         ) : (
-                          <Button variant='outlined' component='label' size='small' startIcon={<i className='tabler-upload' />}>
+                          <Button
+                            variant='outlined'
+                            component='label'
+                            size='small'
+                            startIcon={<i className='tabler-upload' />}
+                          >
                             Seleccionar Video MP4
-                            <input
-                              type='file'
-                              accept='video/mp4'
-                              hidden
-                              onChange={e => handleVideoChange(index, e)}
-                            />
+                            <input type='file' accept='video/mp4' hidden onChange={e => handleVideoChange(index, e)} />
                           </Button>
                         )}
                       </Box>
