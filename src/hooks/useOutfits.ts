@@ -14,7 +14,10 @@ export const useOutfitById = (id: number) => {
   return useQuery({
     queryKey: ['outfit', id],
     queryFn: () => outfitService.getOutfitById(id),
-    enabled: !!id
+    enabled: !!id,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: 'always'
   })
 }
 
@@ -34,8 +37,9 @@ export const useUpdateOutfit = () => {
 
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: UpdateOutfitRequest }) => outfitService.updateOutfit(id, data),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['outfits'] })
+      queryClient.invalidateQueries({ queryKey: ['outfit', variables.id] })
     }
   })
 }
@@ -55,5 +59,22 @@ export const useVariants = (params?: { limit?: number; page?: number; search?: s
   return useQuery({
     queryKey: ['variants', params],
     queryFn: () => outfitService.getVariants(params)
+  })
+}
+
+export const useDeleteMultimedia = () => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (urls: string[]) => outfitService.deleteMultimedia(urls),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['outfits'],
+        refetchType: 'active'
+      })
+    },
+    onError: error => {
+      console.error('Error deleting multimedia:', error)
+    }
   })
 }

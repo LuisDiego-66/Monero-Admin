@@ -40,6 +40,8 @@ export interface ProductColorsResponse {
 export interface CreateOutfitRequest {
   name: string
   productColorIds: number[]
+  images?: string[]
+  videos?: string[]
 }
 
 export interface OutfitProductColor {
@@ -52,6 +54,8 @@ export interface Outfit {
   id: number
   name: string
   productColors: OutfitProductColor[]
+  images?: string[]
+  videos?: string[]
   createdAt?: string
   updatedAt?: string
 }
@@ -59,4 +63,6 @@ export interface Outfit {
 export interface UpdateOutfitRequest {
   name?: string
   productColorIds?: number[]
+  images?: string[]
+  videos?: string[]
 }

@@ -35,6 +35,36 @@ class OutfitServiceClass {
 
     return response.data
   }
+
+  async uploadImage(file: File): Promise<{ url: string }> {
+    const formData = new FormData()
+
+    formData.append('files', file)
+
+    const response = await apiClient.post<string[]>('/api/multimedia', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+
+    return { url: response.data[0] }
+  }
+
+  async uploadVideo(file: File): Promise<{ url: string }> {
+    const formData = new FormData()
+
+    formData.append('files', file)
+
+    const response = await apiClient.post<string[]>('/api/multimedia', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+
+    return { url: response.data[0] }
+  }
+
+  async deleteMultimedia(urls: string[]): Promise<void> {
+    await apiClient.delete('/api/multimedia', {
+      data: urls
+    })
+  }
 }
 
 export const outfitService = new OutfitServiceClass()

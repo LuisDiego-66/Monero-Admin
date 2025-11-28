@@ -19,10 +19,12 @@ import CircularProgress from '@mui/material/CircularProgress'
 import Divider from '@mui/material/Divider'
 import Badge from '@mui/material/Badge'
 import MenuItem from '@mui/material/MenuItem'
+import IconButton from '@mui/material/IconButton'
 import type { TextFieldProps } from '@mui/material/TextField'
 
 import CustomTextField from '@core/components/mui/TextField'
-import { useVariants, useCreateOutfit, useUpdateOutfit } from '@/hooks/useOutfits'
+import { useVariants, useCreateOutfit, useUpdateOutfit, useDeleteMultimedia } from '@/hooks/useOutfits'
+import { outfitService } from '@/services/outfitService'
 
 import type { Outfit, ProductColor } from '@/types/api/outfits'
 
@@ -68,8 +70,17 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(12)
 
+  // Estados para imágenes y videos
+  const [imageFiles, setImageFiles] = useState<File[]>([])
+  const [videoFiles, setVideoFiles] = useState<File[]>([])
+  const [images, setImages] = useState<string[]>([])
+  const [videos, setVideos] = useState<string[]>([])
+  const [imagePreviews, setImagePreviews] = useState<string[]>([])
+  const [isDraggingImage, setIsDraggingImage] = useState(false)
+
   const createOutfit = useCreateOutfit()
   const updateOutfit = useUpdateOutfit()
+  const deleteMultimedia = useDeleteMultimedia()
 
   const queryParams = useMemo(
     () => ({
@@ -98,6 +109,46 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
     return variantsData?.meta?.hasPreviousPage || false
   }, [variantsData])
 
+  const validateImageFile = useCallback(
+    (file: File): boolean => {
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png']
+
+      if (!validTypes.includes(file.type.toLowerCase())) {
+        onError('Solo se permiten imágenes en formato JPG, JPEG o PNG')
+
+        return false
+      }
+
+      if (file.size > 2 * 1024 * 1024) {
+        onError('La imagen no debe superar los 2MB')
+
+        return false
+      }
+
+      return true
+    },
+    [onError]
+  )
+
+  const validateVideoFile = useCallback(
+    (file: File): boolean => {
+      if (file.type !== 'video/mp4') {
+        onError('Solo se permiten videos en formato MP4')
+
+        return false
+      }
+
+      if (file.size > 3 * 1024 * 1024) {
+        onError('El video no debe superar los 3MB')
+
+        return false
+      }
+
+      return true
+    },
+    [onError]
+  )
+
   useEffect(() => {
     if (open) {
       if (outfit) {
@@ -105,9 +156,21 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
         const productColorIds = outfit.productColors?.map(pc => pc.id) || []
 
         setSelectedProductColors(productColorIds)
+        setImages(outfit.images || [])
+        setVideos(outfit.videos || [])
+
+        // Crear previews para las imágenes existentes
+        setImagePreviews(outfit.images || [])
+        setImageFiles([])
+        setVideoFiles([])
       } else {
         setOutfitName('')
         setSelectedProductColors([])
+        setImages([])
+        setVideos([])
+        setImagePreviews([])
+        setImageFiles([])
+        setVideoFiles([])
       }
 
       setSearchTerm('')
@@ -164,6 +227,160 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
     return selectedFromCurrent
   }, [productColors, selectedProductColors, outfit])
 
+  const handleImageChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(event.target.files || [])
+
+      if (images.length + imageFiles.length + files.length > 3) {
+        onError('Máximo 3 imágenes permitidas')
+
+        return
+      }
+
+      const validFiles = files.filter(file => validateImageFile(file))
+
+      if (validFiles.length > 0) {
+        setImageFiles(prev => [...prev, ...validFiles])
+
+        // Crear previews
+        validFiles.forEach(file => {
+          const reader = new FileReader()
+
+          reader.onloadend = () => {
+            setImagePreviews(prev => [...prev, reader.result as string])
+          }
+
+          reader.readAsDataURL(file)
+        })
+      }
+    },
+    [images.length, imageFiles.length, validateImageFile, onError]
+  )
+
+  const handleImageDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDraggingImage(true)
+  }, [])
+
+  const handleImageDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDraggingImage(false)
+  }, [])
+
+  const handleImageDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }, [])
+
+  const handleImageDrop = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault()
+      e.stopPropagation()
+      setIsDraggingImage(false)
+
+      const files = Array.from(e.dataTransfer.files)
+
+      if (images.length + imageFiles.length + files.length > 3) {
+        onError('Máximo 3 imágenes permitidas')
+
+        return
+      }
+
+      const validFiles = files.filter(file => validateImageFile(file))
+
+      if (validFiles.length > 0) {
+        setImageFiles(prev => [...prev, ...validFiles])
+
+        // Crear previews
+        validFiles.forEach(file => {
+          const reader = new FileReader()
+
+          reader.onloadend = () => {
+            setImagePreviews(prev => [...prev, reader.result as string])
+          }
+
+          reader.readAsDataURL(file)
+        })
+      }
+    },
+    [images.length, imageFiles.length, validateImageFile, onError]
+  )
+
+  const handleRemoveImage = useCallback(
+    async (index: number) => {
+      const totalImages = images.length
+      const isServerImage = index < totalImages
+
+      if (isServerImage) {
+        // Eliminar imagen del servidor
+        const imageUrl = images[index]
+
+        try {
+          await deleteMultimedia.mutateAsync([imageUrl])
+        } catch (error) {
+          console.error('Error deleting image:', error)
+        }
+
+        setImages(prev => prev.filter((_, i) => i !== index))
+        setImagePreviews(prev => prev.filter((_, i) => i !== index))
+      } else {
+        // Eliminar archivo local
+        const localIndex = index - totalImages
+
+        setImageFiles(prev => prev.filter((_, i) => i !== localIndex))
+        setImagePreviews(prev => prev.filter((_, i) => i !== index))
+      }
+    },
+    [images, deleteMultimedia]
+  )
+
+  const handleVideoChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(event.target.files || [])
+
+      if (videos.length + videoFiles.length + files.length > 2) {
+        onError('Máximo 2 videos permitidos')
+
+        return
+      }
+
+      const validFiles = files.filter(file => validateVideoFile(file))
+
+      if (validFiles.length > 0) {
+        setVideoFiles(prev => [...prev, ...validFiles])
+      }
+    },
+    [videos.length, videoFiles.length, validateVideoFile, onError]
+  )
+
+  const handleRemoveVideo = useCallback(
+    async (index: number) => {
+      const totalVideos = videos.length
+      const isServerVideo = index < totalVideos
+
+      if (isServerVideo) {
+        // Eliminar video del servidor
+        const videoUrl = videos[index]
+
+        try {
+          await deleteMultimedia.mutateAsync([videoUrl])
+        } catch (error) {
+          console.error('Error deleting video:', error)
+        }
+
+        setVideos(prev => prev.filter((_, i) => i !== index))
+      } else {
+        // Eliminar archivo local
+        const localIndex = index - totalVideos
+
+        setVideoFiles(prev => prev.filter((_, i) => i !== localIndex))
+      }
+    },
+    [videos, deleteMultimedia]
+  )
+
   const handleSubmit = useCallback(async () => {
     if (!outfitName.trim()) {
       onError('Debe ingresar un nombre para el outfit')
@@ -178,19 +395,41 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
     }
 
     try {
+      // Subir nuevas imágenes
+      const uploadedImageUrls = [...images]
+
+      for (const imageFile of imageFiles) {
+        const result = await outfitService.uploadImage(imageFile)
+
+        uploadedImageUrls.push(result.url)
+      }
+
+      // Subir nuevos videos
+      const uploadedVideoUrls = [...videos]
+
+      for (const videoFile of videoFiles) {
+        const result = await outfitService.uploadVideo(videoFile)
+
+        uploadedVideoUrls.push(result.url)
+      }
+
       if (outfit) {
         await updateOutfit.mutateAsync({
           id: outfit.id,
           data: {
             name: outfitName,
-            productColorIds: selectedProductColors
+            productColorIds: selectedProductColors,
+            images: uploadedImageUrls.length > 0 ? uploadedImageUrls : [],
+            videos: uploadedVideoUrls.length > 0 ? uploadedVideoUrls : []
           }
         })
         onSuccess('Outfit actualizado correctamente')
       } else {
         await createOutfit.mutateAsync({
           name: outfitName,
-          productColorIds: selectedProductColors
+          productColorIds: selectedProductColors,
+          images: uploadedImageUrls.length > 0 ? uploadedImageUrls : [],
+          videos: uploadedVideoUrls.length > 0 ? uploadedVideoUrls : []
         })
         onSuccess('Outfit creado correctamente')
       }
@@ -199,7 +438,20 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
     } catch (error) {
       onError(error instanceof Error ? error.message : 'Error al guardar el outfit')
     }
-  }, [outfitName, selectedProductColors, outfit, createOutfit, updateOutfit, onSuccess, onError, onClose])
+  }, [
+    outfitName,
+    selectedProductColors,
+    images,
+    videos,
+    imageFiles,
+    videoFiles,
+    outfit,
+    createOutfit,
+    updateOutfit,
+    onSuccess,
+    onError,
+    onClose
+  ])
 
   const handleLoadMore = useCallback(() => {
     if (hasNextPage) {
@@ -225,6 +477,139 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
             fullWidth
             required
           />
+
+          <Box>
+            <Typography variant='subtitle1' sx={{ mb: 2, fontWeight: 600 }}>
+              Imágenes del Outfit (Máximo 3)
+            </Typography>
+            <Box
+              onDragEnter={handleImageDragEnter}
+              onDragOver={handleImageDragOver}
+              onDragLeave={handleImageDragLeave}
+              onDrop={handleImageDrop}
+              sx={{
+                border: '2px dashed',
+                borderColor: isDraggingImage ? 'primary.main' : 'divider',
+                borderRadius: 1,
+                p: 3,
+                textAlign: 'center',
+                backgroundColor: isDraggingImage ? 'action.hover' : 'background.paper',
+                transition: 'all 0.2s',
+                cursor: 'pointer',
+                mb: 2
+              }}
+            >
+              <label htmlFor='outfit-images-upload' style={{ cursor: 'pointer', display: 'block' }}>
+                <input
+                  id='outfit-images-upload'
+                  type='file'
+                  accept='image/jpeg,image/jpg,image/png'
+                  multiple
+                  style={{ display: 'none' }}
+                  onChange={handleImageChange}
+                  disabled={images.length + imageFiles.length >= 3}
+                />
+                <Box sx={{ py: 2 }}>
+                  <i className='tabler-upload' style={{ fontSize: '2rem', opacity: 0.5 }} />
+                  <Typography variant='body2' sx={{ mt: 1 }}>
+                    Arrastra imágenes aquí o haz clic para seleccionar
+                  </Typography>
+                  <Typography variant='caption' color='text.secondary'>
+                    Máximo 3 imágenes - 2MB cada una - JPG, JPEG, PNG
+                  </Typography>
+                </Box>
+              </label>
+            </Box>
+            {imagePreviews.length > 0 && (
+              <Grid container spacing={2}>
+                {imagePreviews.map((preview, index) => (
+                  <Grid item xs={12} sm={4} key={index}>
+                    <Card sx={{ position: 'relative' }}>
+                      <CardMedia component='img' height='150' image={preview} alt={`Imagen ${index + 1}`} />
+                      <IconButton
+                        onClick={() => handleRemoveImage(index)}
+                        sx={{
+                          position: 'absolute',
+                          top: 8,
+                          right: 8,
+                          backgroundColor: 'background.paper'
+                        }}
+                        size='small'
+                      >
+                        <i className='tabler-x' />
+                      </IconButton>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+            )}
+          </Box>
+
+          <Box>
+            <Typography variant='subtitle1' sx={{ mb: 2, fontWeight: 600 }}>
+              Videos del Outfit (Máximo 2)
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {videos.map((videoUrl, index) => (
+                <Box
+                  key={`server-video-${index}`}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    p: 1.5,
+                    bgcolor: 'primary.lighter',
+                    borderRadius: 1,
+                    border: '1px solid',
+                    borderColor: 'primary.main'
+                  }}
+                >
+                  <i className='tabler-video' style={{ fontSize: '1.25rem' }} />
+                  <Typography variant='body2' sx={{ flex: 1, fontWeight: 500, color: 'primary.main' }}>
+                    Video {index + 1} (MP4)
+                  </Typography>
+                  <IconButton size='small' onClick={() => handleRemoveVideo(index)} color='error'>
+                    <i className='tabler-trash' />
+                  </IconButton>
+                </Box>
+              ))}
+              {videoFiles.map((file, index) => (
+                <Box
+                  key={`local-video-${index}`}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    p: 1.5,
+                    bgcolor: 'success.lighter',
+                    borderRadius: 1,
+                    border: '1px solid',
+                    borderColor: 'success.main'
+                  }}
+                >
+                  <i className='tabler-video' style={{ fontSize: '1.25rem', color: 'green' }} />
+                  <Typography variant='body2' sx={{ flex: 1, fontWeight: 500 }}>
+                    {file.name}
+                  </Typography>
+                  <IconButton size='small' onClick={() => handleRemoveVideo(videos.length + index)} color='error'>
+                    <i className='tabler-x' />
+                  </IconButton>
+                </Box>
+              ))}
+              {videos.length + videoFiles.length < 2 && (
+                <Button
+                  variant='outlined'
+                  component='label'
+                  size='small'
+                  startIcon={<i className='tabler-upload' />}
+                  sx={{ alignSelf: 'flex-start' }}
+                >
+                  Seleccionar Video MP4
+                  <input type='file' accept='video/mp4' hidden onChange={handleVideoChange} />
+                </Button>
+              )}
+            </Box>
+          </Box>
 
           <Divider />
 
