@@ -18,7 +18,6 @@ import Alert from '@mui/material/Alert'
 import CircularProgress from '@mui/material/CircularProgress'
 import Divider from '@mui/material/Divider'
 import Badge from '@mui/material/Badge'
-import MenuItem from '@mui/material/MenuItem'
 import IconButton from '@mui/material/IconButton'
 import type { TextFieldProps } from '@mui/material/TextField'
 
@@ -67,10 +66,6 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
   const [outfitName, setOutfitName] = useState('')
   const [selectedProductColors, setSelectedProductColors] = useState<number[]>([])
   const [searchTerm, setSearchTerm] = useState('')
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(12)
-
-  // Estados para imágenes y videos
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const [videoFiles, setVideoFiles] = useState<File[]>([])
   const [images, setImages] = useState<string[]>([])
@@ -84,29 +79,17 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
 
   const queryParams = useMemo(
     () => ({
-      limit: pageSize,
-      page: page,
+      limit: 8,
+      page: 1,
       search: searchTerm
     }),
-    [pageSize, page, searchTerm]
+    [searchTerm]
   )
 
   const { data: variantsData, isLoading } = useVariants(queryParams)
 
   const productColors = useMemo(() => {
     return variantsData?.data || []
-  }, [variantsData])
-
-  const totalRecords = useMemo(() => {
-    return variantsData?.meta?.total || 0
-  }, [variantsData])
-
-  const hasNextPage = useMemo(() => {
-    return variantsData?.meta?.hasNextPage || false
-  }, [variantsData])
-
-  const hasPreviousPage = useMemo(() => {
-    return variantsData?.meta?.hasPreviousPage || false
   }, [variantsData])
 
   const validateImageFile = useCallback(
@@ -158,8 +141,6 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
         setSelectedProductColors(productColorIds)
         setImages(outfit.images || [])
         setVideos(outfit.videos || [])
-
-        // Crear previews para las imágenes existentes
         setImagePreviews(outfit.images || [])
         setImageFiles([])
         setVideoFiles([])
@@ -174,7 +155,6 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
       }
 
       setSearchTerm('')
-      setPage(1)
     }
   }, [open, outfit])
 
@@ -230,19 +210,11 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
   const handleImageChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const files = Array.from(event.target.files || [])
-
-      if (images.length + imageFiles.length + files.length > 3) {
-        onError('Máximo 3 imágenes permitidas')
-
-        return
-      }
-
       const validFiles = files.filter(file => validateImageFile(file))
 
       if (validFiles.length > 0) {
         setImageFiles(prev => [...prev, ...validFiles])
 
-        // Crear previews
         validFiles.forEach(file => {
           const reader = new FileReader()
 
@@ -254,7 +226,7 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
         })
       }
     },
-    [images.length, imageFiles.length, validateImageFile, onError]
+    [validateImageFile]
   )
 
   const handleImageDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -281,19 +253,11 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
       setIsDraggingImage(false)
 
       const files = Array.from(e.dataTransfer.files)
-
-      if (images.length + imageFiles.length + files.length > 3) {
-        onError('Máximo 3 imágenes permitidas')
-
-        return
-      }
-
       const validFiles = files.filter(file => validateImageFile(file))
 
       if (validFiles.length > 0) {
         setImageFiles(prev => [...prev, ...validFiles])
 
-        // Crear previews
         validFiles.forEach(file => {
           const reader = new FileReader()
 
@@ -305,7 +269,7 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
         })
       }
     },
-    [images.length, imageFiles.length, validateImageFile, onError]
+    [validateImageFile]
   )
 
   const handleRemoveImage = useCallback(
@@ -339,20 +303,13 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
   const handleVideoChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const files = Array.from(event.target.files || [])
-
-      if (videos.length + videoFiles.length + files.length > 2) {
-        onError('Máximo 2 videos permitidos')
-
-        return
-      }
-
       const validFiles = files.filter(file => validateVideoFile(file))
 
       if (validFiles.length > 0) {
         setVideoFiles(prev => [...prev, ...validFiles])
       }
     },
-    [videos.length, videoFiles.length, validateVideoFile, onError]
+    [validateVideoFile]
   )
 
   const handleRemoveVideo = useCallback(
@@ -453,18 +410,6 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
     onClose
   ])
 
-  const handleLoadMore = useCallback(() => {
-    if (hasNextPage) {
-      setPage(prev => prev + 1)
-    }
-  }, [hasNextPage])
-
-  const handleLoadPrevious = useCallback(() => {
-    if (hasPreviousPage) {
-      setPage(prev => prev - 1)
-    }
-  }, [hasPreviousPage])
-
   return (
     <Dialog open={open} onClose={onClose} maxWidth='lg' fullWidth>
       <DialogTitle>{outfit ? 'Editar Outfit' : 'Crear Nuevo Outfit'}</DialogTitle>
@@ -480,7 +425,7 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
 
           <Box>
             <Typography variant='subtitle1' sx={{ mb: 2, fontWeight: 600 }}>
-              Imágenes del Outfit (Máximo 3)
+              Imágenes del Outfit
             </Typography>
             <Box
               onDragEnter={handleImageDragEnter}
@@ -507,7 +452,6 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
                   multiple
                   style={{ display: 'none' }}
                   onChange={handleImageChange}
-                  disabled={images.length + imageFiles.length >= 3}
                 />
                 <Box sx={{ py: 2 }}>
                   <i className='tabler-upload' style={{ fontSize: '2rem', opacity: 0.5 }} />
@@ -515,7 +459,7 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
                     Arrastra imágenes aquí o haz clic para seleccionar
                   </Typography>
                   <Typography variant='caption' color='text.secondary'>
-                    Máximo 3 imágenes - 2MB cada una - JPG, JPEG, PNG
+                    2MB cada una - JPG, JPEG, PNG
                   </Typography>
                 </Box>
               </label>
@@ -526,19 +470,19 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
                   <Grid item xs={12} sm={4} key={index}>
                     <Card sx={{ position: 'relative' }}>
                       <CardMedia component='img' height='150' image={preview} alt={`Imagen ${index + 1}`} />
-                      <IconButton
-                        onClick={() => handleRemoveImage(index)}
-                        sx={{
-                          position: 'absolute',
-                          top: 8,
-                          right: 8,
-                          backgroundColor: 'background.paper'
-                        }}
-                        size='small'
-                      >
-                        <i className='tabler-x' />
-                      </IconButton>
-                    </Card>
+                    <IconButton
+                      onClick={() => handleRemoveImage(index)}
+                      sx={{
+                        position: 'absolute',
+                        top: 8,
+                        right: 8,
+                        backgroundColor: 'background.paper'
+                      }}
+                      size='small'
+                    >
+                      <i className='tabler-x' />
+                    </IconButton>
+                  </Card>
                   </Grid>
                 ))}
               </Grid>
@@ -547,7 +491,7 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
 
           <Box>
             <Typography variant='subtitle1' sx={{ mb: 2, fontWeight: 600 }}>
-              Videos del Outfit (Máximo 2)
+              Videos del Outfit
             </Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {videos.map((videoUrl, index) => (
@@ -596,18 +540,16 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
                   </IconButton>
                 </Box>
               ))}
-              {videos.length + videoFiles.length < 2 && (
-                <Button
-                  variant='outlined'
-                  component='label'
-                  size='small'
-                  startIcon={<i className='tabler-upload' />}
-                  sx={{ alignSelf: 'flex-start' }}
-                >
-                  Seleccionar Video MP4
-                  <input type='file' accept='video/mp4' hidden onChange={handleVideoChange} />
-                </Button>
-              )}
+              <Button
+                variant='outlined'
+                component='label'
+                size='small'
+                startIcon={<i className='tabler-upload' />}
+                sx={{ alignSelf: 'flex-start' }}
+              >
+                Seleccionar Video MP4
+                <input type='file' accept='video/mp4' multiple hidden onChange={handleVideoChange} />
+              </Button>
             </Box>
           </Box>
 
@@ -617,32 +559,39 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
             <Typography variant='subtitle1' sx={{ mb: 2, fontWeight: 600 }}>
               Buscar Prendas
             </Typography>
-            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2 }}>
-              <DebouncedInput
-                value={searchTerm}
-                onChange={value => {
-                  setSearchTerm(String(value))
-                  setPage(1)
-                }}
-                placeholder='Buscar por nombre de producto...'
-                fullWidth
-                size='small'
-              />
-              <CustomTextField
-                select
-                value={pageSize}
-                onChange={e => {
-                  setPageSize(Number(e.target.value))
-                  setPage(1)
-                }}
-                className='is-[70px]'
-                size='small'
-              >
-                <MenuItem value={12}>12</MenuItem>
-                <MenuItem value={24}>24</MenuItem>
-                <MenuItem value={48}>48</MenuItem>
-              </CustomTextField>
-            </Box>
+
+            {selectedProductColors.length > 0 && (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant='body2' sx={{ mb: 1, fontWeight: 500 }}>
+                  Seleccionadas ({selectedProductColors.length}):
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
+                  {selectedProductColorsDetails.map(pc => {
+                    const productName = pc.product?.name || 'Producto'
+                    const colorName = pc.color?.name || 'Color'
+
+                    return (
+                      <Chip
+                        key={pc.id}
+                        label={`${productName} - ${colorName}`}
+                        onDelete={() => handleRemoveProductColor(pc.id)}
+                        color='primary'
+                        variant='filled'
+                        size='small'
+                      />
+                    )
+                  })}
+                </Box>
+              </Box>
+            )}
+
+            <DebouncedInput
+              value={searchTerm}
+              onChange={value => setSearchTerm(String(value))}
+              placeholder='Buscar por nombre de producto...'
+              fullWidth
+              size='small'
+            />
           </Box>
 
           {isLoading ? (
@@ -652,121 +601,69 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
           ) : productColors.length === 0 ? (
             <Alert severity='info'>No se encontraron productos</Alert>
           ) : (
-            <>
-              <Grid container spacing={2}>
-                {productColors.map(productColor => {
-                  const isSelected = isProductColorSelected(productColor.id)
-                  const imageUrl = productColor.multimedia?.[0] || ''
+            <Grid container spacing={2}>
+              {productColors.map(productColor => {
+                const isSelected = isProductColorSelected(productColor.id)
+                const imageUrl = productColor.multimedia?.[0] || ''
 
-                  return (
-                    <Grid item xs={12} sm={6} md={4} lg={3} key={productColor.id}>
-                      <Card
+                return (
+                  <Grid item xs={12} sm={6} md={4} lg={3} key={productColor.id}>
+                    <Card
+                      sx={{
+                        cursor: 'pointer',
+                        border: isSelected ? 2 : 1,
+                        borderColor: isSelected ? 'primary.main' : 'divider',
+                        transition: 'all 0.2s',
+                        '&:hover': {
+                          transform: 'translateY(-4px)',
+                          boxShadow: 4
+                        }
+                      }}
+                      onClick={() => handleToggleProductColor(productColor.id)}
+                    >
+                      <Badge
+                        badgeContent={isSelected ? <i className='tabler-check' /> : null}
+                        color='primary'
                         sx={{
-                          cursor: 'pointer',
-                          border: isSelected ? 2 : 1,
-                          borderColor: isSelected ? 'primary.main' : 'divider',
-                          transition: 'all 0.2s',
-                          '&:hover': {
-                            transform: 'translateY(-4px)',
-                            boxShadow: 4
+                          width: '100%',
+                          '& .MuiBadge-badge': {
+                            top: 10,
+                            right: 10
                           }
                         }}
-                        onClick={() => handleToggleProductColor(productColor.id)}
                       >
-                        <Badge
-                          badgeContent={isSelected ? <i className='tabler-check' /> : null}
-                          color='primary'
-                          sx={{
-                            width: '100%',
-                            '& .MuiBadge-badge': {
-                              top: 10,
-                              right: 10
-                            }
-                          }}
-                        >
-                          <CardMedia
-                            component='img'
-                            height='200'
-                            image={imageUrl || '/images/placeholder.png'}
-                            alt={productColor.product.name}
-                            sx={{ objectFit: 'cover', height: 200 }}
+                        <CardMedia
+                          component='img'
+                          height='200'
+                          image={imageUrl || '/images/placeholder.png'}
+                          alt={productColor.product.name}
+                          sx={{ objectFit: 'cover', height: 200 }}
+                        />
+                      </Badge>
+                      <CardContent>
+                        <Typography variant='subtitle2' noWrap sx={{ fontWeight: 600 }}>
+                          {productColor.product.name}
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 0.5, mt: 1, alignItems: 'center' }}>
+                          <Chip
+                            label={productColor.color.name}
+                            size='small'
+                            sx={{
+                              backgroundColor: productColor.color.code,
+                              color: 'white'
+                            }}
                           />
-                        </Badge>
-                        <CardContent>
-                          <Typography variant='subtitle2' noWrap sx={{ fontWeight: 600 }}>
-                            {productColor.product.name}
+                          <Typography variant='caption' color='text.secondary'>
+                            ${productColor.product.price}
                           </Typography>
-                          <Box sx={{ display: 'flex', gap: 0.5, mt: 1, alignItems: 'center' }}>
-                            <Chip
-                              label={productColor.color.name}
-                              size='small'
-                              sx={{
-                                backgroundColor: productColor.color.code,
-                                color: 'white'
-                              }}
-                            />
-                            <Typography variant='caption' color='text.secondary'>
-                              ${productColor.product.price}
-                            </Typography>
-                          </Box>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                  )
-                })}
-              </Grid>
-
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
-                <Button
-                  variant='outlined'
-                  disabled={!hasPreviousPage}
-                  onClick={handleLoadPrevious}
-                  startIcon={<i className='tabler-chevron-left' />}
-                >
-                  Anterior
-                </Button>
-                <Typography variant='body2' color='text.secondary'>
-                  Página {page} - {totalRecords} productos
-                </Typography>
-                <Button
-                  variant='outlined'
-                  disabled={!hasNextPage}
-                  onClick={handleLoadMore}
-                  endIcon={<i className='tabler-chevron-right' />}
-                >
-                  Siguiente
-                </Button>
-              </Box>
-            </>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                )
+              })}
+            </Grid>
           )}
-
-          <Divider />
-
-          <Box>
-            <Typography variant='subtitle1' sx={{ mb: 2, fontWeight: 600 }}>
-              Prendas Seleccionadas ({selectedProductColors.length})
-            </Typography>
-            {selectedProductColors.length === 0 ? (
-              <Alert severity='warning'>No has seleccionado ninguna prenda</Alert>
-            ) : (
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                {selectedProductColorsDetails.map(pc => {
-                  const productName = pc.product?.name || 'Producto'
-                  const colorName = pc.color?.name || 'Color'
-
-                  return (
-                    <Chip
-                      key={pc.id}
-                      label={`${productName} - ${colorName}`}
-                      onDelete={() => handleRemoveProductColor(pc.id)}
-                      color='primary'
-                      variant='outlined'
-                    />
-                  )
-                })}
-              </Box>
-            )}
-          </Box>
         </Box>
       </DialogContent>
       <DialogActions>
