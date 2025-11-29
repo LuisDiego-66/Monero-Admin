@@ -37,11 +37,14 @@ export interface ProductColorsResponse {
   }
 }
 
+export type Gender = 'male' | 'female'
+
 export interface CreateOutfitRequest {
   name: string
   productColorIds: number[]
   images?: string[]
   videos?: string[]
+  gender: Gender
 }
 
 export interface OutfitProductColor {
@@ -56,6 +59,7 @@ export interface Outfit {
   productColors: OutfitProductColor[]
   images?: string[]
   videos?: string[]
+  gender: Gender
   createdAt?: string
   updatedAt?: string
 }
@@ -65,4 +69,5 @@ export interface UpdateOutfitRequest {
   productColorIds?: number[]
   images?: string[]
   videos?: string[]
+  gender?: Gender
 }

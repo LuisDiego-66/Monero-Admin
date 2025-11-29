@@ -19,13 +19,18 @@ import CircularProgress from '@mui/material/CircularProgress'
 import Divider from '@mui/material/Divider'
 import Badge from '@mui/material/Badge'
 import IconButton from '@mui/material/IconButton'
+import Radio from '@mui/material/Radio'
+import RadioGroup from '@mui/material/RadioGroup'
+import FormControlLabel from '@mui/material/FormControlLabel'
+import FormControl from '@mui/material/FormControl'
+import FormLabel from '@mui/material/FormLabel'
 import type { TextFieldProps } from '@mui/material/TextField'
 
 import CustomTextField from '@core/components/mui/TextField'
 import { useVariants, useCreateOutfit, useUpdateOutfit, useDeleteMultimedia } from '@/hooks/useOutfits'
 import { outfitService } from '@/services/outfitService'
 
-import type { Outfit, ProductColor } from '@/types/api/outfits'
+import type { Outfit, ProductColor, Gender } from '@/types/api/outfits'
 
 interface CreateEditOutfitModalProps {
   open: boolean
@@ -72,6 +77,7 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
   const [videos, setVideos] = useState<string[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
   const [isDraggingImage, setIsDraggingImage] = useState(false)
+  const [gender, setGender] = useState<Gender>('male')
 
   const createOutfit = useCreateOutfit()
   const updateOutfit = useUpdateOutfit()
@@ -144,6 +150,7 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
         setImagePreviews(outfit.images || [])
         setImageFiles([])
         setVideoFiles([])
+        setGender(outfit.gender)
       } else {
         setOutfitName('')
         setSelectedProductColors([])
@@ -152,6 +159,7 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
         setImagePreviews([])
         setImageFiles([])
         setVideoFiles([])
+        setGender('male')
       }
 
       setSearchTerm('')
@@ -377,7 +385,8 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
             name: outfitName,
             productColorIds: selectedProductColors,
             images: uploadedImageUrls.length > 0 ? uploadedImageUrls : [],
-            videos: uploadedVideoUrls.length > 0 ? uploadedVideoUrls : []
+            videos: uploadedVideoUrls.length > 0 ? uploadedVideoUrls : [],
+            gender: gender
           }
         })
         onSuccess('Outfit actualizado correctamente')
@@ -386,7 +395,8 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
           name: outfitName,
           productColorIds: selectedProductColors,
           images: uploadedImageUrls.length > 0 ? uploadedImageUrls : [],
-          videos: uploadedVideoUrls.length > 0 ? uploadedVideoUrls : []
+          videos: uploadedVideoUrls.length > 0 ? uploadedVideoUrls : [],
+          gender: gender
         })
         onSuccess('Outfit creado correctamente')
       }
@@ -402,6 +412,7 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
     videos,
     imageFiles,
     videoFiles,
+    gender,
     outfit,
     createOutfit,
     updateOutfit,
@@ -422,6 +433,16 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
             fullWidth
             required
           />
+
+          <FormControl component='fieldset'>
+            <FormLabel component='legend' sx={{ fontWeight: 600, mb: 1 }}>
+              Género *
+            </FormLabel>
+            <RadioGroup row value={gender} onChange={e => setGender(e.target.value as Gender)}>
+              <FormControlLabel value='male' control={<Radio />} label='Masculino' />
+              <FormControlLabel value='female' control={<Radio />} label='Femenino' />
+            </RadioGroup>
+          </FormControl>
 
           <Box>
             <Typography variant='subtitle1' sx={{ mb: 2, fontWeight: 600 }}>

@@ -236,6 +236,18 @@ const OutfitsListTable = () => {
         filterFn: 'fuzzy'
       },
       {
+        accessorKey: 'gender',
+        header: 'Género',
+        cell: ({ row }) => (
+          <Chip
+            label={row.original.gender === 'male' ? 'Masculino' : 'Femenino'}
+            color={row.original.gender === 'male' ? 'primary' : 'secondary'}
+            size='small'
+            icon={<i className={row.original.gender === 'male' ? 'tabler-gender-male' : 'tabler-gender-female'} />}
+          />
+        )
+      },
+      {
         accessorKey: 'productColors',
         header: 'Prendas',
         cell: ({ row }) => {
