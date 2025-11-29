@@ -51,6 +51,28 @@ export interface OutfitProductColor {
   id: number
   multimedia: string[]
   pdfs: string[]
+  color?: {
+    id: number
+    name: string
+    code: string
+  }
+  product?: {
+    id: number
+    name: string
+    description: string
+    price: string
+    enabled: boolean
+    createdAt?: string
+    discount?: any
+  }
+  variants?: Array<{
+    id: number
+    size: {
+      id: number
+      name: string
+    }
+    availableStock: number
+  }>
 }
 
 export interface Outfit {

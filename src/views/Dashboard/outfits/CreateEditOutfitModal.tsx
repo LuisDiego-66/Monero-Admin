@@ -27,10 +27,10 @@ import FormLabel from '@mui/material/FormLabel'
 import type { TextFieldProps } from '@mui/material/TextField'
 
 import CustomTextField from '@core/components/mui/TextField'
-import { useVariants, useCreateOutfit, useUpdateOutfit, useDeleteMultimedia } from '@/hooks/useOutfits'
+import { useVariants, useCreateOutfit, useUpdateOutfit, useDeleteMultimedia, useOutfitById } from '@/hooks/useOutfits'
 import { outfitService } from '@/services/outfitService'
 
-import type { Outfit, ProductColor, Gender } from '@/types/api/outfits'
+import type { Outfit, ProductColor, OutfitProductColor, Gender } from '@/types/api/outfits'
 
 interface CreateEditOutfitModalProps {
   open: boolean
@@ -70,6 +70,7 @@ const DebouncedInput = ({
 const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: CreateEditOutfitModalProps) => {
   const [outfitName, setOutfitName] = useState('')
   const [selectedProductColors, setSelectedProductColors] = useState<number[]>([])
+  const [selectedProductColorsCache, setSelectedProductColorsCache] = useState<ProductColor[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const [videoFiles, setVideoFiles] = useState<File[]>([])
@@ -82,6 +83,9 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
   const createOutfit = useCreateOutfit()
   const updateOutfit = useUpdateOutfit()
   const deleteMultimedia = useDeleteMultimedia()
+
+  const { data: outfitDetails } = useOutfitById(outfit?.id || 0)
+  const fullOutfit = outfit?.id ? outfitDetails : outfit
 
   const queryParams = useMemo(
     () => ({
@@ -140,17 +144,18 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
 
   useEffect(() => {
     if (open) {
-      if (outfit) {
-        setOutfitName(outfit.name)
-        const productColorIds = outfit.productColors?.map(pc => pc.id) || []
+      if (fullOutfit) {
+        setOutfitName(fullOutfit.name)
+        const productColorIds = fullOutfit.productColors?.map(pc => pc.id) || []
 
         setSelectedProductColors(productColorIds)
-        setImages(outfit.images || [])
-        setVideos(outfit.videos || [])
-        setImagePreviews(outfit.images || [])
+        setImages(fullOutfit.images || [])
+        setVideos(fullOutfit.videos || [])
+        setImagePreviews(fullOutfit.images || [])
         setImageFiles([])
         setVideoFiles([])
-        setGender(outfit.gender)
+        setGender(fullOutfit.gender)
+        setSelectedProductColorsCache([])
       } else {
         setOutfitName('')
         setSelectedProductColors([])
@@ -160,21 +165,35 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
         setImageFiles([])
         setVideoFiles([])
         setGender('male')
+        setSelectedProductColorsCache([])
       }
 
       setSearchTerm('')
     }
-  }, [open, outfit])
+  }, [open, fullOutfit])
 
-  const handleToggleProductColor = useCallback((productColorId: number) => {
-    setSelectedProductColors(prev => {
-      if (prev.includes(productColorId)) {
-        return prev.filter(id => id !== productColorId)
-      } else {
-        return [...prev, productColorId]
+  const handleToggleProductColor = useCallback(
+    (productColorId: number, productColorData?: ProductColor) => {
+      setSelectedProductColors(prev => {
+        if (prev.includes(productColorId)) {
+          return prev.filter(id => id !== productColorId)
+        } else {
+          return [...prev, productColorId]
+        }
+      })
+
+      if (productColorData && !selectedProductColors.includes(productColorId)) {
+        setSelectedProductColorsCache(prev => {
+          if (!prev.find(pc => pc.id === productColorId)) {
+            return [...prev, productColorData]
+          }
+
+          return prev
+        })
       }
-    })
-  }, [])
+    },
+    [selectedProductColors]
+  )
 
   const handleRemoveProductColor = useCallback((productColorId: number) => {
     setSelectedProductColors(prev => prev.filter(id => id !== productColorId))
@@ -188,32 +207,21 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
   )
 
   const selectedProductColorsDetails = useMemo(() => {
-    const selectedFromCurrent = productColors.filter(pc => selectedProductColors.includes(pc.id))
+    const allAvailable: (ProductColor | OutfitProductColor)[] = [
+      ...productColors,
+      ...selectedProductColorsCache
+    ]
 
-    if (outfit) {
-      const outfitProductColors = outfit.productColors || []
-      const selectedFromOutfit = outfitProductColors.filter(pc => selectedProductColors.includes(pc.id))
+    if (fullOutfit) {
+      const outfitProductColors = fullOutfit.productColors || []
 
-      const allSelected = [...selectedFromCurrent]
-
-      selectedFromOutfit.forEach(outfitPc => {
-        if (!allSelected.find(pc => pc.id === outfitPc.id)) {
-          allSelected.push({
-            id: outfitPc.id,
-            multimedia: outfitPc.multimedia,
-            pdfs: outfitPc.pdfs,
-            color: { id: 0, name: 'N/A', code: '#000000' },
-            product: { id: 0, name: 'Producto', description: '', price: '0', enabled: true },
-            variants: []
-          })
-        }
-      })
-
-      return allSelected
+      allAvailable.push(...outfitProductColors)
     }
 
-    return selectedFromCurrent
-  }, [productColors, selectedProductColors, outfit])
+    const unique = allAvailable.filter((pc, index, self) => self.findIndex(p => p.id === pc.id) === index)
+
+    return unique.filter(pc => selectedProductColors.includes(pc.id))
+  }, [productColors, selectedProductColors, fullOutfit, selectedProductColorsCache])
 
   const handleImageChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -378,9 +386,9 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
         uploadedVideoUrls.push(result.url)
       }
 
-      if (outfit) {
+      if (fullOutfit) {
         await updateOutfit.mutateAsync({
-          id: outfit.id,
+          id: fullOutfit.id,
           data: {
             name: outfitName,
             productColorIds: selectedProductColors,
@@ -413,7 +421,7 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
     imageFiles,
     videoFiles,
     gender,
-    outfit,
+    fullOutfit,
     createOutfit,
     updateOutfit,
     onSuccess,
@@ -423,7 +431,7 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth='lg' fullWidth>
-      <DialogTitle>{outfit ? 'Editar Outfit' : 'Crear Nuevo Outfit'}</DialogTitle>
+      <DialogTitle>{fullOutfit ? 'Editar Outfit' : 'Crear Nuevo Outfit'}</DialogTitle>
       <DialogContent>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 2 }}>
           <CustomTextField
@@ -640,7 +648,7 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
                           boxShadow: 4
                         }
                       }}
-                      onClick={() => handleToggleProductColor(productColor.id)}
+                      onClick={() => handleToggleProductColor(productColor.id, productColor)}
                     >
                       <Badge
                         badgeContent={isSelected ? <i className='tabler-check' /> : null}
