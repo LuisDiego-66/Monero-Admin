@@ -1,6 +1,8 @@
 'use client'
 
-import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react'
+import React, { useState, useMemo, useRef, useEffect } from 'react'
+
+import { useRouter } from 'next/navigation'
 
 import {
   Grid,
@@ -12,7 +14,6 @@ import {
   IconButton,
   Box,
   Chip,
-  Divider,
   Badge,
   Paper,
   InputAdornment,
@@ -25,11 +26,12 @@ import {
   Stepper,
   Step,
   StepLabel,
-  LinearProgress
+  LinearProgress,
+  TablePagination
 } from '@mui/material'
 
 import { useAddToCart, useRepriceCart, useCreateOrder, useConfirmOrder, useCancelOrder } from '@/hooks/useSales'
-import { useInfiniteVariants } from '@/hooks/useVariants'
+import { useVariants } from '@/hooks/useVariants'
 import type { CartItem, RepriceResponse, Order } from '@/types/api/sales'
 import type { Variant, VariantSize } from '@/types/api/variants'
 
@@ -70,6 +72,7 @@ const QRCodeSVG = () => (
 )
 
 const PointOfSale: React.FC = () => {
+  const router = useRouter()
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [cartItems, setCartItems] = useState<CartItemLocal[]>([])
@@ -84,10 +87,13 @@ const PointOfSale: React.FC = () => {
   const [timeRemaining, setTimeRemaining] = useState<number>(0)
   const [orderExpiresAt, setOrderExpiresAt] = useState<Date | null>(null)
   const [showCancelDialog, setShowCancelDialog] = useState(false)
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [variantsPage, setVariantsPage] = useState(1)
+  const [variantsLimit] = useState(10)
 
-  const catalogScrollRef = useRef<HTMLDivElement>(null)
   const debounceTimerRef = useRef<NodeJS.Timeout>()
   const timerIntervalRef = useRef<NodeJS.Timeout>()
+  const skipDebounceRef = useRef(false)
 
   const addToCartMutation = useAddToCart()
   const repriceMutation = useRepriceCart()
@@ -95,17 +101,33 @@ const PointOfSale: React.FC = () => {
   const confirmOrderMutation = useConfirmOrder()
   const cancelOrderMutation = useCancelOrder()
 
-  const {
-    data: variantsPages,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-    isLoading: isLoadingVariants
-  } = useInfiniteVariants(6, debouncedSearch)
+  const { data: variantsData, isLoading: isLoadingVariants } = useVariants(variantsPage, variantsLimit, debouncedSearch)
 
   useEffect(() => {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current)
+    }
+
+    // Detectar formato QR: <qr>123</qr> y buscar inmediatamente
+    const qrMatch = searchTerm.match(/<qr>\d+<\/qr>/)
+
+    if (qrMatch) {
+      // Enviar el formato completo al backend
+      setDebouncedSearch(searchTerm)
+      skipDebounceRef.current = true
+
+      setTimeout(() => {
+        setSearchTerm('')
+      }, 100)
+
+      return
+    }
+
+    // Si acabamos de limpiar después de un QR, no hacer nada
+    if (skipDebounceRef.current && searchTerm === '') {
+      skipDebounceRef.current = false
+
+      return
     }
 
     debounceTimerRef.current = setTimeout(() => {
@@ -142,27 +164,26 @@ const PointOfSale: React.FC = () => {
   }, [orderExpiresAt])
 
   const flattenedVariants = useMemo(() => {
-    if (!variantsPages) return []
+    if (!variantsData?.data) return []
 
-    return variantsPages.pages.flatMap(page =>
-      page.data
-        .flatMap((variant: Variant) =>
-          (variant.variants || []).map((size: VariantSize) => ({
-            variantSizeId: size.id,
-            colorVariant: variant,
-            sizeVariant: size,
-            displayName: variant.product?.name || 'Producto',
-            color: variant.color,
-            size: typeof size.size === 'string' ? size.size : size.size?.name,
-            stock: size.availableStock || size.quantity || 0,
-            multimedia: variant.multimedia,
-            product: variant.product,
-            price: variant.product?.price
-          }))
-        )
-        .filter(item => item.variantSizeId)
-    )
-  }, [variantsPages])
+    return variantsData.data
+      .flatMap((variant: Variant) =>
+        (variant.variants || []).map((size: VariantSize) => ({
+          variantSizeId: size.id,
+          colorVariant: variant,
+          sizeVariant: size,
+          displayName: variant.product?.name || 'Producto',
+          color: variant.color,
+          size: typeof size.size === 'string' ? size.size : size.size?.name,
+          stock: size.availableStock || size.quantity || 0,
+          multimedia: variant.multimedia,
+          product: variant.product,
+          price: variant.product?.price
+        }))
+      )
+      .filter(item => item.variantSizeId)
+      .slice(0, variantsLimit)
+  }, [variantsData, variantsLimit])
 
   const formatCurrency = (amount: number | string) => {
     const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount
@@ -345,6 +366,7 @@ const PointOfSale: React.FC = () => {
 
       setCurrentStep('COMPLETED')
       setShowPaymentDialog(false)
+      setShowSuccessDialog(true)
 
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current)
@@ -400,6 +422,23 @@ const PointOfSale: React.FC = () => {
     }
   }
 
+  const handleCloseWithoutOrder = () => {
+    setShowPaymentDialog(false)
+
+    setCurrentStep('BUILDING_CART')
+    setActiveStepIndex(0)
+    setRepriceData(null)
+    setCartToken('')
+    setSelectedPayment('')
+    setOrderData(null)
+    setTimeRemaining(0)
+    setOrderExpiresAt(null)
+
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current)
+    }
+  }
+
   const calculateLocalTotals = () => {
     if (repriceData) {
       return {
@@ -419,45 +458,16 @@ const PointOfSale: React.FC = () => {
     confirmOrderMutation.isPending ||
     cancelOrderMutation.isPending
 
-  const handleCatalogScroll = useCallback(
-    (e: React.UIEvent<HTMLDivElement>) => {
-      const target = e.currentTarget
-      const scrollPercentage = (target.scrollTop + target.clientHeight) / target.scrollHeight
-
-      if (scrollPercentage > 0.8 && hasNextPage && !isFetchingNextPage) {
-        fetchNextPage()
-      }
-    },
-    [hasNextPage, isFetchingNextPage, fetchNextPage]
-  )
+  const handleVariantsPageChange = (_: unknown, newPage: number) => {
+    setVariantsPage(newPage + 1)
+  }
 
   const timerProgress = orderExpiresAt ? (timeRemaining / (15 * 60)) * 100 : 100
 
   return (
-    <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column', bgcolor: 'background.default' }}>
-      <Paper sx={{ borderRadius: 0, mb: 2 }} elevation={1}>
-        <Box sx={{ p: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant='h4' fontWeight='bold' color='primary'>
-            Punto de Venta
-          </Typography>
-          <Typography variant='body2' color='text.secondary'>
-            {new Date().toLocaleDateString()} - {new Date().toLocaleTimeString()}
-          </Typography>
-        </Box>
-      </Paper>
-
-      {cartItems.length > 0 && (
-        <Box sx={{ px: 3, py: 2, bgcolor: 'background.paper' }}>
-          <Stepper activeStep={activeStepIndex}>
-            {steps.map((label, index) => (
-              <Step key={label} completed={activeStepIndex > index}>
-                <StepLabel>{label}</StepLabel>
-              </Step>
-            ))}
-          </Stepper>
-        </Box>
-      )}
-
+    <Box
+      sx={{ height: 'calc(100vh - 180px)', display: 'flex', flexDirection: 'column', bgcolor: 'background.default' }}
+    >
       {errorMessage && (
         <Box sx={{ px: 3, pt: 2 }}>
           <Alert severity='error' onClose={() => setErrorMessage('')}>
@@ -466,46 +476,37 @@ const PointOfSale: React.FC = () => {
         </Box>
       )}
 
-      {currentStep === 'COMPLETED' && (
-        <Box sx={{ px: 3, pt: 2 }}>
-          <Alert
-            severity='success'
-            action={
-              <Button color='inherit' size='small' onClick={clearCart}>
-                Nueva Venta
-              </Button>
-            }
-          >
-            ✅ ¡Venta completada exitosamente! Orden #{orderData?.id}
-          </Alert>
-        </Box>
-      )}
-
-      {currentStep === 'CANCELLED' && (
-        <Box sx={{ px: 3, pt: 2 }}>
-          <Alert
-            severity='warning'
-            action={
-              <Button color='inherit' size='small' onClick={clearCart}>
-                Nueva Venta
-              </Button>
-            }
-          >
-            ⚠️ Orden #{orderData?.id} cancelada. El stock ha sido liberado.
-          </Alert>
-        </Box>
-      )}
-
-      <Box sx={{ flex: 1, p: 3, overflow: 'auto' }}>
+      <Box sx={{ flex: 1, p: 3, overflow: 'hidden' }}>
         <Grid container spacing={3} sx={{ height: '100%' }}>
-          <Grid item xs={12} md={8}>
+          <Grid item xs={12} md={8} sx={{ height: '100%' }}>
             <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
               <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-                  <Typography variant='h6'>Catálogo de Productos</Typography>
-                  <Badge badgeContent={cartItems.length} color='primary'>
-                    <span style={{ fontSize: '1.2em' }}>🛒</span>
-                  </Badge>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Typography variant='h6'>Catálogo de Productos</Typography>
+                    <Badge badgeContent={cartItems.length} color='primary'>
+                      <span style={{ fontSize: '1.2em' }}>🛒</span>
+                    </Badge>
+                  </Box>
+                  {cartItems.length > 0 && (
+                    <Box sx={{ flex: 1, maxWidth: '400px', ml: 0 }}>
+                      <Stepper
+                        activeStep={activeStepIndex}
+                        sx={{
+                          p: 0,
+                          justifyContent: 'flex-start',
+                          '& .MuiStep-root': { paddingLeft: 0 },
+                          '& .MuiStepLabel-label': { textAlign: 'left', marginLeft: 0 }
+                        }}
+                      >
+                        {steps.map((label, index) => (
+                          <Step key={index}>
+                            <StepLabel>{label}</StepLabel>
+                          </Step>
+                        ))}
+                      </Stepper>
+                    </Box>
+                  )}
                 </Box>
                 <TextField
                   fullWidth
@@ -521,12 +522,8 @@ const PointOfSale: React.FC = () => {
                   }}
                 />
               </Box>
-              <CardContent
-                sx={{ flex: 1, overflow: 'auto', p: 3 }}
-                ref={catalogScrollRef}
-                onScroll={handleCatalogScroll}
-              >
-                {isLoadingVariants && flattenedVariants.length === 0 ? (
+              <CardContent sx={{ flex: 1, overflow: 'auto', p: 3 }}>
+                {isLoadingVariants ? (
                   <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
                     <CircularProgress />
                   </Box>
@@ -536,96 +533,94 @@ const PointOfSale: React.FC = () => {
                     <Typography variant='h6'>No se encontraron productos</Typography>
                   </Box>
                 ) : (
-                  <>
-                    <Grid container spacing={2}>
-                      {flattenedVariants.map(item => (
-                        <Grid item xs={6} sm={4} md={3} lg={2.4} key={`${item.variantSizeId}-${item.colorVariant.id}`}>
-                          <Card
-                            sx={{
-                              cursor: 'pointer',
-                              transition: 'all 0.2s',
-                              height: '100%',
-                              opacity: isLoading ? 0.6 : 1,
-                              pointerEvents: isLoading ? 'none' : 'auto',
-                              '&:hover': {
-                                transform: 'translateY(-4px)',
-                                boxShadow: 4
-                              }
-                            }}
-                            onClick={() => addToCart(item)}
-                          >
-                            <CardContent sx={{ textAlign: 'center', p: 2 }}>
+                  <Grid container spacing={2}>
+                    {flattenedVariants.map(item => (
+                      <Grid item xs={6} sm={4} md={3} lg={2.4} key={`${item.variantSizeId}-${item.colorVariant.id}`}>
+                        <Card
+                          sx={{
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            height: '100%',
+                            opacity: isLoading ? 0.6 : 1,
+                            pointerEvents: isLoading ? 'none' : 'auto',
+                            '&:hover': {
+                              transform: 'translateY(-4px)',
+                              boxShadow: 4
+                            }
+                          }}
+                          onClick={() => addToCart(item)}
+                        >
+                          <CardContent sx={{ textAlign: 'center', p: 2 }}>
+                            <Box
+                              component='img'
+                              src={item.multimedia?.[0] || 'https://via.placeholder.com/150'}
+                              alt={item.displayName}
+                              sx={{
+                                width: 60,
+                                height: 60,
+                                objectFit: 'cover',
+                                borderRadius: 1,
+                                mb: 1,
+                                mx: 'auto',
+                                display: 'block'
+                              }}
+                            />
+                            <Typography variant='body2' fontWeight='bold' sx={{ mb: 1, minHeight: '2.4em' }}>
+                              {item.displayName}
+                            </Typography>
+                            <Chip label={`ID: ${item.variantSizeId}`} size='small' sx={{ mb: 1 }} />
+                            <Box
+                              sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 1 }}
+                            >
                               <Box
-                                component='img'
-                                src={item.multimedia?.[0] || 'https://via.placeholder.com/150'}
-                                alt={item.displayName}
                                 sx={{
-                                  width: 60,
-                                  height: 60,
-                                  objectFit: 'cover',
-                                  borderRadius: 1,
-                                  mb: 1,
-                                  mx: 'auto',
-                                  display: 'block'
+                                  width: 16,
+                                  height: 16,
+                                  borderRadius: '50%',
+                                  bgcolor: item.color?.code || '#ccc',
+                                  border: 1,
+                                  borderColor: 'divider'
                                 }}
                               />
-                              <Typography variant='body2' fontWeight='bold' sx={{ mb: 1, minHeight: '2.4em' }}>
-                                {item.displayName}
+                              <Typography variant='caption' color='text.secondary'>
+                                {item.color?.name}
                               </Typography>
-                              <Chip label={`ID: ${item.variantSizeId}`} size='small' sx={{ mb: 1 }} />
-                              <Box
-                                sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 1 }}
-                              >
-                                <Box
-                                  sx={{
-                                    width: 16,
-                                    height: 16,
-                                    borderRadius: '50%',
-                                    bgcolor: item.color?.code || '#ccc',
-                                    border: 1,
-                                    borderColor: 'divider'
-                                  }}
-                                />
-                                <Typography variant='caption' color='text.secondary'>
-                                  {item.color?.name}
-                                </Typography>
-                              </Box>
-                              <Typography variant='caption' color='text.secondary' display='block' sx={{ mb: 1 }}>
-                                Talla: {item.size}
-                              </Typography>
-                              <Typography variant='h6' color='primary' fontWeight='bold' sx={{ mb: 1 }}>
-                                {item.price ? formatCurrency(item.price) : '-'}
-                              </Typography>
-                              <Chip
-                                label={`Stock: ${item.stock}`}
-                                size='small'
-                                color={item.stock > 10 ? 'success' : item.stock > 0 ? 'warning' : 'error'}
-                              />
-                            </CardContent>
-                          </Card>
-                        </Grid>
-                      ))}
-                    </Grid>
-                    {isFetchingNextPage && (
-                      <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
-                        <CircularProgress />
-                      </Box>
-                    )}
-                    {!hasNextPage && flattenedVariants.length > 0 && (
-                      <Box sx={{ textAlign: 'center', py: 3 }}>
-                        <Typography variant='caption' color='text.secondary'>
-                          No hay más productos
-                        </Typography>
-                      </Box>
-                    )}
-                  </>
+                            </Box>
+                            <Typography variant='caption' color='text.secondary' display='block' sx={{ mb: 1 }}>
+                              Talla: {item.size}
+                            </Typography>
+                            <Typography variant='h6' color='primary' fontWeight='bold' sx={{ mb: 1 }}>
+                              {item.price ? formatCurrency(item.price) : '-'}
+                            </Typography>
+                            <Chip
+                              label={`Stock: ${item.stock}`}
+                              size='small'
+                              color={item.stock > 10 ? 'success' : item.stock > 0 ? 'warning' : 'error'}
+                            />
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    ))}
+                  </Grid>
                 )}
               </CardContent>
+              {flattenedVariants.length > 0 && (
+                <TablePagination
+                  component='div'
+                  count={variantsData?.meta?.total || 0}
+                  page={variantsPage - 1}
+                  onPageChange={handleVariantsPageChange}
+                  rowsPerPage={variantsLimit}
+                  rowsPerPageOptions={[10]}
+                  labelRowsPerPage='Productos por página:'
+                  labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
+                />
+              )}
             </Card>
           </Grid>
 
-          <Grid item xs={12} md={4}>
-            <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <Grid item xs={12} md={4} sx={{ height: '100%' }}>
+            <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', maxHeight: '100%' }}>
               <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider' }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Box>
@@ -643,7 +638,8 @@ const PointOfSale: React.FC = () => {
                   </IconButton>
                 </Box>
               </Box>
-              <CardContent sx={{ flex: 1, overflow: 'auto', p: 3 }}>
+
+              <CardContent sx={{ flex: 1, overflow: 'auto', p: 2, minHeight: 0 }}>
                 {cartItems.length === 0 ? (
                   <Box sx={{ textAlign: 'center', py: 8, color: 'text.secondary' }}>
                     <Typography sx={{ fontSize: '3rem', mb: 2, opacity: 0.5 }}>🛒</Typography>
@@ -659,16 +655,16 @@ const PointOfSale: React.FC = () => {
                       const repriceItem = repriceData?.items.find(ri => ri.variantId === item.variantId)
 
                       return (
-                        <Card key={item.variantId} sx={{ mb: 2 }}>
-                          <CardContent>
+                        <Card key={item.variantId} sx={{ mb: 1.5 }}>
+                          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
                             <Box
-                              sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}
+                              sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}
                             >
                               <Box sx={{ flex: 1 }}>
-                                <Typography variant='body1' fontWeight='bold'>
+                                <Typography variant='body2' fontWeight='bold'>
                                   {variantInfo?.displayName || 'Producto'}
                                 </Typography>
-                                <Typography variant='caption' color='text.secondary'>
+                                <Typography variant='caption' color='text.secondary' fontSize='0.7rem'>
                                   {variantInfo?.size} | {variantInfo?.color?.name}
                                 </Typography>
                               </Box>
@@ -678,26 +674,27 @@ const PointOfSale: React.FC = () => {
                                   color='error'
                                   onClick={() => removeFromCart(item.variantId)}
                                   disabled={isLoading}
+                                  sx={{ p: 0.5 }}
                                 >
-                                  <span>🗑️</span>
+                                  <span style={{ fontSize: '0.9rem' }}>🗑️</span>
                                 </IconButton>
                               )}
                             </Box>
-                            <Divider sx={{ my: 1 }} />
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
                               {currentStep === 'BUILDING_CART' ? (
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                   <IconButton
                                     size='small'
                                     onClick={() => updateQuantity(item.variantId, item.quantity - 1)}
                                     disabled={isLoading}
+                                    sx={{ p: 0.5 }}
                                   >
-                                    ➖
+                                    <span style={{ fontSize: '0.8rem' }}>➖</span>
                                   </IconButton>
                                   <Typography
-                                    variant='body1'
+                                    variant='body2'
                                     fontWeight='bold'
-                                    sx={{ minWidth: 30, textAlign: 'center' }}
+                                    sx={{ minWidth: 24, textAlign: 'center' }}
                                   >
                                     {item.quantity}
                                   </Typography>
@@ -705,17 +702,18 @@ const PointOfSale: React.FC = () => {
                                     size='small'
                                     onClick={() => updateQuantity(item.variantId, item.quantity + 1)}
                                     disabled={isLoading}
+                                    sx={{ p: 0.5 }}
                                   >
-                                    ➕
+                                    <span style={{ fontSize: '0.8rem' }}>➕</span>
                                   </IconButton>
                                 </Box>
                               ) : (
-                                <Typography variant='body1' fontWeight='bold'>
-                                  Cantidad: {item.quantity}
+                                <Typography variant='body2' fontWeight='bold'>
+                                  Cant: {item.quantity}
                                 </Typography>
                               )}
                               <Box sx={{ textAlign: 'right' }}>
-                                <Typography variant='caption' color='text.secondary' display='block'>
+                                <Typography variant='caption' color='text.secondary' display='block' fontSize='0.65rem'>
                                   {repriceItem
                                     ? formatCurrency(repriceItem.unit_price)
                                     : variantInfo?.price
@@ -723,7 +721,7 @@ const PointOfSale: React.FC = () => {
                                       : '-'}{' '}
                                   c/u
                                 </Typography>
-                                <Typography variant='h6' color='primary' fontWeight='bold'>
+                                <Typography variant='body1' color='primary' fontWeight='bold'>
                                   {repriceItem
                                     ? formatCurrency(repriceItem.totalPrice)
                                     : variantInfo?.price
@@ -739,14 +737,15 @@ const PointOfSale: React.FC = () => {
                   </Box>
                 )}
               </CardContent>
+
               {cartItems.length > 0 && (
-                <Box sx={{ p: 3, borderTop: 1, borderColor: 'divider' }}>
-                  <Paper sx={{ p: 2, mb: 2, bgcolor: 'action.hover' }}>
+                <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider', bgcolor: 'background.paper' }}>
+                  <Paper sx={{ p: 1.5, mb: 1.5, bgcolor: 'action.hover' }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Typography variant='h6' fontWeight='bold'>
+                      <Typography variant='body1' fontWeight='bold'>
                         Total:
                       </Typography>
-                      <Typography variant='h5' fontWeight='bold' color='primary'>
+                      <Typography variant='h6' fontWeight='bold' color='primary'>
                         {repriceData
                           ? `Bs ${localTotals.total.toFixed(2)}`
                           : `Bs ${cartItems
@@ -763,7 +762,7 @@ const PointOfSale: React.FC = () => {
                       <Typography
                         variant='caption'
                         color='text.secondary'
-                        sx={{ display: 'block', mt: 1, textAlign: 'right' }}
+                        sx={{ display: 'block', mt: 0.5, textAlign: 'right', fontSize: '0.65rem' }}
                       >
                         *Estimado (sujeto a verificación)
                       </Typography>
@@ -773,18 +772,21 @@ const PointOfSale: React.FC = () => {
                     <Button
                       variant='contained'
                       fullWidth
-                      size='large'
+                      size='medium'
                       onClick={verifyStockAndPrices}
                       disabled={cartItems.length === 0 || isLoading}
-                      startIcon={isLoading ? <CircularProgress size={20} color='inherit' /> : <span>✓</span>}
+                      startIcon={isLoading ? <CircularProgress size={18} color='inherit' /> : <span>✓</span>}
+                      sx={{ py: 1 }}
                     >
-                      {isLoading ? 'Procesando...' : 'Continuar a Pago'}
+                      {isLoading ? 'Procesando...' : 'Proceder al pago'}
                     </Button>
                   ) : (
-                    <Alert severity='info'>
-                      {currentStep === 'VERIFYING_STOCK' && 'Verificando disponibilidad...'}
-                      {currentStep === 'ORDER_CREATED' && 'Orden creada, seleccione método de pago'}
-                      {currentStep === 'PAYMENT' && 'Procesando pago...'}
+                    <Alert severity='info' sx={{ py: 0.5 }}>
+                      <Typography variant='caption'>
+                        {currentStep === 'VERIFYING_STOCK' && 'Verificando disponibilidad...'}
+                        {currentStep === 'ORDER_CREATED' && 'Orden creada, seleccione método de pago'}
+                        {currentStep === 'PAYMENT' && 'Procesando pago...'}
+                      </Typography>
                     </Alert>
                   )}
                 </Box>
@@ -901,24 +903,32 @@ const PointOfSale: React.FC = () => {
           )}
         </DialogContent>
         <DialogActions sx={{ p: 3, gap: 2 }}>
-          <Button
-            onClick={() => setShowCancelDialog(true)}
-            color='error'
-            variant='outlined'
-            disabled={isLoading || currentStep === 'PAYMENT'}
-            fullWidth
-          >
-            Cancelar Orden
-          </Button>
-          <Button
-            variant='contained'
-            onClick={confirmPayment}
-            disabled={!orderData || isLoading || (!!orderData && timeRemaining === 0)}
-            startIcon={isLoading ? <CircularProgress size={20} color='inherit' /> : <span>💳</span>}
-            fullWidth
-          >
-            {isLoading ? 'Procesando...' : 'Confirmar Pago'}
-          </Button>
+          {!orderData ? (
+            <Button onClick={handleCloseWithoutOrder} variant='outlined' fullWidth>
+              Cerrar
+            </Button>
+          ) : (
+            <>
+              <Button
+                onClick={() => setShowCancelDialog(true)}
+                color='error'
+                variant='outlined'
+                disabled={isLoading || currentStep === 'PAYMENT'}
+                fullWidth
+              >
+                Cancelar Orden
+              </Button>
+              <Button
+                variant='contained'
+                onClick={confirmPayment}
+                disabled={!orderData || isLoading || (!!orderData && timeRemaining === 0)}
+                startIcon={isLoading ? <CircularProgress size={20} color='inherit' /> : <span>💳</span>}
+                fullWidth
+              >
+                {isLoading ? 'Procesando...' : 'Confirmar Pago'}
+              </Button>
+            </>
+          )}
         </DialogActions>
       </Dialog>
 
@@ -947,6 +957,52 @@ const PointOfSale: React.FC = () => {
             fullWidth
           >
             {isLoading ? 'Cancelando...' : 'Sí, Cancelar'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={showSuccessDialog} maxWidth='xs' fullWidth disableEscapeKeyDown>
+        <DialogTitle>
+          <Box sx={{ textAlign: 'center' }}>
+            <Typography sx={{ fontSize: '3.5rem', mb: 1 }}>✅</Typography>
+            <Typography variant='h5' fontWeight='bold' color='success.main'>
+              ¡Venta Completada!
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ textAlign: 'center', py: 2 }}>
+            <Typography variant='body1' color='text.secondary' gutterBottom>
+              La venta se realizó exitosamente
+            </Typography>
+            {orderData && (
+              <Typography variant='h6' fontWeight='bold' color='primary' sx={{ mt: 2 }}>
+                Orden #{orderData.id}
+              </Typography>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, gap: 2, flexDirection: 'column' }}>
+          <Button
+            variant='contained'
+            fullWidth
+            size='large'
+            onClick={() => {
+              setShowSuccessDialog(false)
+              clearCart()
+            }}
+          >
+            Aceptar
+          </Button>
+          <Button
+            variant='outlined'
+            fullWidth
+            size='large'
+            onClick={() => {
+              router.push('/sales/list')
+            }}
+          >
+            Ver lista de ventas
           </Button>
         </DialogActions>
       </Dialog>

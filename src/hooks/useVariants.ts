@@ -144,6 +144,14 @@ export const useCreateBrand = () => {
   })
 }
 
+export const useVariants = (page: number = 1, limit: number = 10, search: string = '') => {
+  return useQuery({
+    queryKey: ['variants', 'paginated', page, limit, search],
+    queryFn: () => variantService.getAllVariants(page, limit, search),
+    staleTime: 30000
+  })
+}
+
 export const useInfiniteVariants = (limit: number = 6, search: string = '') => {
   return useInfiniteQuery({
     queryKey: ['variants', 'infinite', limit, search],
