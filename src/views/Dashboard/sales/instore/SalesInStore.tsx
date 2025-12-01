@@ -47,7 +47,8 @@ interface PaymentMethod {
 type SaleStep = 'BUILDING_CART' | 'VERIFYING_STOCK' | 'ORDER_CREATED' | 'PAYMENT' | 'COMPLETED' | 'CANCELLED'
 
 const paymentMethods: PaymentMethod[] = [
-  { id: 'efectivo', name: 'Efectivo', icon: '💵', color: '#4caf50' },
+  { id: 'cash', name: 'Efectivo', icon: '💵', color: '#4caf50' },
+  { id: 'card', name: 'Tarjeta', icon: '💳', color: '#2196f3' },
   { id: 'qr', name: 'QR', icon: '📱', color: '#ff9800' }
 ]
 
@@ -267,7 +268,9 @@ const PointOfSale: React.FC = () => {
       const repriceResponse = await repriceMutation.mutateAsync(cartResponse.token)
 
       setRepriceData(repriceResponse)
-      await createOrder(cartResponse.token)
+      setCurrentStep('ORDER_CREATED')
+      setActiveStepIndex(2)
+      setShowPaymentDialog(true)
     } catch (error: any) {
       const errorMsg = error?.response?.data?.message || 'Error al verificar disponibilidad de productos'
 
@@ -285,11 +288,27 @@ const PointOfSale: React.FC = () => {
     }
   }
 
-  const createOrder = async (token: string) => {
+  const handlePaymentMethodSelect = async (paymentType: 'cash' | 'card' | 'qr') => {
+    if (!cartToken) {
+      setErrorMessage('No hay carrito disponible')
+
+      return
+    }
+
+    setSelectedPayment(paymentType)
+
+    if (orderData) {
+      return
+    }
+
     try {
-      setCurrentStep('ORDER_CREATED')
-      setActiveStepIndex(2)
-      const payload = { token: token }
+      setErrorMessage('')
+
+      const payload = {
+        token: cartToken,
+        payment_type: paymentType
+      }
+
       const order = await createOrderMutation.mutateAsync(payload)
 
       setOrderData(order)
@@ -299,18 +318,17 @@ const PointOfSale: React.FC = () => {
 
         setOrderExpiresAt(expirationDate)
       }
-
-      setShowPaymentDialog(true)
     } catch (error: any) {
       setErrorMessage(error?.response?.data?.message || 'Error al crear la orden')
-      setCurrentStep('BUILDING_CART')
-      setActiveStepIndex(0)
+      setSelectedPayment('')
+      setCurrentStep('ORDER_CREATED')
+      setActiveStepIndex(2)
     }
   }
 
   const confirmPayment = async () => {
-    if (!orderData || !selectedPayment) {
-      setErrorMessage('Seleccione un método de pago')
+    if (!orderData) {
+      setErrorMessage('No hay orden creada')
 
       return
     }
@@ -320,14 +338,11 @@ const PointOfSale: React.FC = () => {
       setCurrentStep('PAYMENT')
       setActiveStepIndex(3)
 
-      const payload = {
-        paymentMethod: selectedPayment as 'efectivo' | 'qr'
-      }
-
       await confirmOrderMutation.mutateAsync({
         orderId: orderData.id,
-        data: payload
+        data: undefined
       })
+
       setCurrentStep('COMPLETED')
       setShowPaymentDialog(false)
 
@@ -788,11 +803,11 @@ const PointOfSale: React.FC = () => {
       >
         <DialogTitle>
           <Typography variant='h5' fontWeight='bold'>
-            Método de Pago - Orden #{orderData?.id}
+            {orderData ? `Método de Pago - Orden #${orderData.id}` : 'Seleccione Método de Pago'}
           </Typography>
         </DialogTitle>
         <DialogContent>
-          {orderExpiresAt && timeRemaining > 0 && (
+          {orderExpiresAt && timeRemaining > 0 && orderData && (
             <Paper sx={{ p: 2, mb: 3, bgcolor: 'warning.lighter', border: 1, borderColor: 'warning.main' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
                 <Typography variant='body1' fontWeight='bold' color='warning.dark'>
@@ -818,7 +833,12 @@ const PointOfSale: React.FC = () => {
 
           <Paper sx={{ p: 3, mb: 3, textAlign: 'center', bgcolor: 'primary.lighter' }}>
             <Typography variant='h4' color='primary' fontWeight='bold'>
-              Total a pagar: {orderData ? formatCurrency(orderData.totalPrice) : 'BS 0'}
+              Total a pagar:{' '}
+              {orderData
+                ? formatCurrency(orderData.totalPrice)
+                : repriceData
+                  ? `Bs ${parseFloat(repriceData.total).toFixed(2)}`
+                  : 'Bs 0.00'}
             </Typography>
           </Paper>
 
@@ -837,7 +857,7 @@ const PointOfSale: React.FC = () => {
                       boxShadow: 2
                     }
                   }}
-                  onClick={() => !isLoading && setSelectedPayment(method.id)}
+                  onClick={() => !isLoading && handlePaymentMethodSelect(method.id as 'cash' | 'card' | 'qr')}
                 >
                   <CardContent>
                     <Box sx={{ fontSize: '3rem', mb: 1 }}>{method.icon}</Box>
@@ -862,11 +882,20 @@ const PointOfSale: React.FC = () => {
             </Paper>
           )}
 
-          {selectedPayment === 'efectivo' && (
+          {selectedPayment === 'cash' && (
             <Paper sx={{ p: 4, mt: 3, textAlign: 'center', bgcolor: 'success.lighter' }}>
               <Typography sx={{ fontSize: '4rem', mb: 2 }}>💵</Typography>
               <Typography variant='h6' fontWeight='bold'>
                 Pago en Efectivo
+              </Typography>
+            </Paper>
+          )}
+
+          {selectedPayment === 'card' && (
+            <Paper sx={{ p: 4, mt: 3, textAlign: 'center', bgcolor: 'info.lighter' }}>
+              <Typography sx={{ fontSize: '4rem', mb: 2 }}>💳</Typography>
+              <Typography variant='h6' fontWeight='bold'>
+                Pago con Tarjeta
               </Typography>
             </Paper>
           )}
@@ -884,7 +913,7 @@ const PointOfSale: React.FC = () => {
           <Button
             variant='contained'
             onClick={confirmPayment}
-            disabled={!selectedPayment || isLoading || timeRemaining === 0}
+            disabled={!orderData || isLoading || (!!orderData && timeRemaining === 0)}
             startIcon={isLoading ? <CircularProgress size={20} color='inherit' /> : <span>💳</span>}
             fullWidth
           >

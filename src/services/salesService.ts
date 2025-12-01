@@ -33,7 +33,11 @@ class CartServiceClass {
   //Crear orden
 
   async createOrder(data: CreateOrderRequest): Promise<Order> {
-    const payload = { items: data.token }
+    const payload = {
+      items: data.token,
+      payment_type: data.payment_type
+    }
+
     const response = await apiClient.post<Order>('/api/orders/in-store', payload)
 
     return response.data
@@ -41,8 +45,8 @@ class CartServiceClass {
 
   //Confirmar orden y pagar
 
-  async confirmOrder(orderId: number, data: ConfirmOrderRequest): Promise<ConfirmOrderResponse> {
-    const response = await apiClient.post<ConfirmOrderResponse>(`/api/orders/confirm/${orderId}`, data)
+  async confirmOrder(orderId: number, data?: ConfirmOrderRequest): Promise<ConfirmOrderResponse> {
+    const response = await apiClient.post<ConfirmOrderResponse>(`/api/orders/confirm/${orderId}`, data || {})
 
     return response.data
   }

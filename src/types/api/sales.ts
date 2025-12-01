@@ -59,11 +59,11 @@ export interface Order {
 
 export interface CreateOrderRequest {
   token: string
+  payment_type: 'cash' | 'card' | 'qr'
   customerId?: string | number
 }
 
 export interface ConfirmOrderRequest {
-  paymentMethod: 'efectivo' | 'qr'
   customerId?: string | number
 }
 

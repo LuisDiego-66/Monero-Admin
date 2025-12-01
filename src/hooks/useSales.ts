@@ -34,7 +34,7 @@ export const useCreateOrder = () => {
 
 export const useConfirmOrder = () => {
   return useMutation({
-    mutationFn: ({ orderId, data }: { orderId: number; data: ConfirmOrderRequest }) =>
+    mutationFn: ({ orderId, data }: { orderId: number; data?: ConfirmOrderRequest }) =>
       cartService.confirmOrder(orderId, data),
     onError: (error: any) => {
       console.error('Error confirming order:', error)
