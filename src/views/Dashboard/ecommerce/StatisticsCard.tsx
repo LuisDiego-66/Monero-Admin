@@ -1,9 +1,12 @@
+'use client'
+
 // MUI Imports
 import Card from '@mui/material/Card'
 import CardHeader from '@mui/material/CardHeader'
 import CardContent from '@mui/material/CardContent'
 import Typography from '@mui/material/Typography'
 import Grid from '@mui/material/Grid2'
+import Skeleton from '@mui/material/Skeleton'
 
 // Type Imports
 import type { ThemeColor } from '@core/types'
@@ -11,48 +14,69 @@ import type { ThemeColor } from '@core/types'
 // Component Imports
 import CustomAvatar from '@core/components/mui/Avatar'
 
+// Hooks
+import { useOrders } from '@/hooks/useSales'
+import { useCustomers } from '@/hooks/useCustomers'
+import { useProducts } from '@/hooks/useProducts'
+
 type DataType = {
   icon: string
-  stats: string
+  stats: string | number
   title: string
   color: ThemeColor
+  isLoading?: boolean
 }
 
-const data: DataType[] = [
-  {
-    stats: '230k',
-    title: 'Ventas',
-    color: 'primary',
-    icon: 'tabler-chart-pie-2'
-  },
-  {
-    color: 'info',
-    stats: '8.549k',
-    title: 'Clientes',
-    icon: 'tabler-users'
-  },
-  {
-    color: 'error',
-    stats: '1.423k',
-    title: 'Productos',
-    icon: 'tabler-shopping-cart'
-  },
-  {
-    stats: '$9.745',
-    color: 'success',
-    title: 'Ingresos',
-    icon: 'tabler-currency-dollar'
-  }
-]
-
 const TarjetaEstadisticas = () => {
+  // Obtener datos de las APIs
+  const { data: ordersData, isLoading: isLoadingOrders } = useOrders({ page: 1, limit: 1 })
+  const { data: customersData, isLoading: isLoadingCustomers } = useCustomers({ page: 1, limit: 1 })
+  const { data: productsData, isLoading: isLoadingProducts } = useProducts({ page: 1, limit: 1 })
+
+  const formatNumber = (num: number) => {
+    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`
+    if (num >= 1000) return `${(num / 1000).toFixed(1)}k`
+    return num.toString()
+  }
+
+  const data: DataType[] = [
+    {
+      stats: ordersData?.meta?.total ? formatNumber(ordersData.meta.total) : '0',
+      title: 'Órdenes',
+      color: 'primary',
+      icon: 'tabler-chart-pie-2',
+      isLoading: isLoadingOrders
+    },
+    {
+      color: 'info',
+      stats: customersData?.total ? formatNumber(customersData.total) : '0',
+      title: 'Clientes',
+      icon: 'tabler-users',
+      isLoading: isLoadingCustomers
+    },
+    {
+      color: 'error',
+      stats: productsData?.total ? formatNumber(productsData.total) : '0',
+      title: 'Productos',
+      icon: 'tabler-shopping-cart',
+      isLoading: isLoadingProducts
+    },
+    {
+      stats: ordersData?.meta?.total ? formatNumber(ordersData.meta.total) : '0',
+      color: 'success',
+      title: 'Ventas',
+      icon: 'tabler-currency-dollar',
+      isLoading: isLoadingOrders
+    }
+  ]
+
   return (
     <Card>
       <CardHeader
         title='Estadísticas'
         action={
           <Typography variant='subtitle2' color='text.disabled'>
-            Actualizado hace 1 mes
+            Actualizado ahora
           </Typography>
         }
       />
@@ -64,8 +88,17 @@ const TarjetaEstadisticas = () => {
                 <i className={item.icon}></i>
               </CustomAvatar>
               <div className='flex flex-col'>
-                <Typography variant='h5'>{item.stats}</Typography>
-                <Typography variant='body2'>{item.title}</Typography>
+                {item.isLoading ? (
+                  <>
+                    <Skeleton variant='text' width={60} height={32} />
+                    <Skeleton variant='text' width={80} height={20} />
+                  </>
+                ) : (
+                  <>
+                    <Typography variant='h5'>{item.stats}</Typography>
+                    <Typography variant='body2'>{item.title}</Typography>
+                  </>
+                )}
               </div>
             </Grid>
           ))}

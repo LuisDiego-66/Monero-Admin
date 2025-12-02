@@ -7,6 +7,8 @@ import StatisticsCard from '@views/Dashboard/ecommerce/StatisticsCard'
 
 // Data Imports
 import { getInvoiceData } from '@/app/server/actions'
+import LowStock from '@/views/Dashboard/ecommerce/LowStock'
+import BestSellers from '@/views/Dashboard/ecommerce/BestSellers'
 
 /**
  * ! If you need data using an API call, uncomment the below API code, update the `process.env.API_URL` variable in the
@@ -38,6 +40,12 @@ const EcommerceDashboard = async () => {
       </Grid>
       <Grid size={{ xs: 12, md: 8 }}>
         <StatisticsCard />
+      </Grid>
+      <Grid size={{ xs: 12, md: 4 }}>
+        <LowStock />
+      </Grid>
+      <Grid size={{ xs: 12, md: 8 }}>
+        <BestSellers />
       </Grid>
     </Grid>
   )

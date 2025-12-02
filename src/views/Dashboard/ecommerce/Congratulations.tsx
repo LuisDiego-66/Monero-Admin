@@ -20,8 +20,8 @@ const BienvenidaAdmin = () => {
             <Typography variant='body2' color='text.secondary' className='mbe-3'>
               Gestiona tu tienda y supervisa todas las operaciones desde aquí
             </Typography>
-            <Button variant='contained' color='primary'>
-              Ver Dashboard
+            <Button variant='contained' color='primary' href='/sales/instore'>
+              Venta en Tienda
             </Button>
           </CardContent>
         </Grid>
@@ -29,7 +29,7 @@ const BienvenidaAdmin = () => {
           <div className='relative bs-full is-full'>
             <img
               alt='Bienvenida Administrador'
-              src='/images/illustrations/auth/logoipsum.png'
+              src='/images/apps/ecommerce/img.png'
               className='max-bs-[150px] absolute block-end-5 inline-end-6 max-is-full'
             />
           </div>
