@@ -10,7 +10,7 @@ import Chip from '@mui/material/Chip'
 import Box from '@mui/material/Box'
 
 // Components Imports
-import OptionMenu from '@core/components/option-menu'
+/* import OptionMenu from '@core/components/option-menu' */
 
 // Hooks
 import { useLowStock } from '@/hooks/useDashboard'
@@ -23,7 +23,8 @@ const LowStock = () => {
       <CardHeader
         title='Productos con Bajo Stock'
         subheader='Productos que necesitan reabastecimiento'
-        action={<OptionMenu options={['Ver Más', 'Refrescar']} />}
+
+     /*    action={<OptionMenu options={['Ver Más', 'Refrescar']} />} */
       />
       <CardContent>
         <Box
