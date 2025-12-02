@@ -13,8 +13,9 @@ import TablePagination from '@mui/material/TablePagination'
 import Chip from '@mui/material/Chip'
 
 // Third-party Imports
-import { createColumnHelper, flexRender, getCoreRowModel, useReactTable, getPaginationRowModel } from '@tanstack/react-table'
-import type { ColumnDef } from '@tanstack/react-table'
+import { createColumnHelper, flexRender, getCoreRowModel, useReactTable, getPaginationRowModel, getFilteredRowModel } from '@tanstack/react-table'
+import type { ColumnDef, FilterFn } from '@tanstack/react-table'
+import { rankItem } from '@tanstack/match-sorter-utils'
 
 // Components Imports
 import OptionMenu from '@core/components/option-menu'
@@ -28,6 +29,14 @@ import type { BestsellerItem } from '@/types/api/dashboard'
 
 // Style Imports
 import tableStyles from '@core/styles/table.module.css'
+
+const fuzzyFilter: FilterFn<any> = (row, columnId, value, addMeta) => {
+  const itemRank = rankItem(row.getValue(columnId), value)
+
+  addMeta({ itemRank })
+
+  return itemRank.passed
+}
 
 const columnHelper = createColumnHelper<BestsellerItem>()
 
@@ -84,7 +93,7 @@ const BestSellers = () => {
         cell: ({ row }) => {
           const price = parseFloat(row.original.productColor.product.price)
 
-          return <Typography className='font-medium'>${price.toFixed(2)}</Typography>
+          return <Typography className='font-medium'>Bs {price.toFixed(2)}</Typography>
         }
       })
     ],
@@ -94,6 +103,9 @@ const BestSellers = () => {
   const table = useReactTable({
     data: bestsellersData || [],
     columns,
+    filterFns: {
+      fuzzy: fuzzyFilter
+    },
     state: {
       rowSelection
     },
@@ -104,6 +116,7 @@ const BestSellers = () => {
     },
     enableRowSelection: false,
     getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     onRowSelectionChange: setRowSelection
   })
@@ -164,7 +177,7 @@ const BestSellers = () => {
               </table>
             </div>
             <TablePagination
-              component={() => <TablePaginationComponent table={table} />}
+              component={() => <TablePaginationComponent table={table as unknown as any} />}
               count={table.getFilteredRowModel().rows.length}
               rowsPerPage={table.getState().pagination.pageSize}
               page={table.getState().pagination.pageIndex}

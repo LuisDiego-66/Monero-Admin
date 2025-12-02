@@ -81,7 +81,7 @@ const LowStock = () => {
                       {productName}
                     </Typography>
                     <Typography variant='body2'>
-                      {`${colorName} - Talla: ${item.size.name} | $${price.toFixed(2)}`}
+                      {`${colorName} - Talla: ${item.size.name} | Bs ${price.toFixed(2)}`}
                     </Typography>
                   </div>
                   <Chip
