@@ -126,7 +126,8 @@ const BestSellers = () => {
       <CardHeader
         title='Productos Más Vendidos'
         subheader='Top productos con más ventas'
-        action={<OptionMenu options={['Ver Más', 'Refrescar']} />}
+
+        /* action={<OptionMenu options={['Ver Más', 'Refrescar']} />} */
       />
       <CardContent>
         {isLoading ? (
