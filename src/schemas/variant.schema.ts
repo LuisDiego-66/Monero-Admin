@@ -12,8 +12,22 @@ export const mediaFileSchema = z.object({
 export const variantSizeFormSchema = z.object({
   id: z.number().optional(),
   size: z.string().min(1, 'La talla es requerida'),
-  quantity: z.number().int().min(1, 'El stock es obligatorio y debe ser mayor a 0')
-})
+  quantity: z.number().int().min(0, 'El stock no puede ser negativo')
+}).refine(
+  data => {
+    // Si tiene id (modo editar), permitir stock 0
+    if (data.id !== undefined) {
+      return true
+    }
+
+    // Si no tiene id (modo crear), requerir stock mayor a 0
+    return data.quantity > 0
+  },
+  {
+    message: 'El stock debe ser mayor a 0 al crear una nueva talla',
+    path: ['quantity']
+  }
+)
 
 export const variantFormSchema = z
   .object({
