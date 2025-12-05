@@ -140,6 +140,17 @@ const verticalMenuData = (): VerticalMenuDataType[] => [
         href: '/sliders/list/'
       }
     ]
+  },
+
+  // Dashboard
+  {
+    isSection: true,
+    label: 'Anuncios'
+  },
+  {
+    label: 'Crear Anuncio',
+    icon: 'tabler-notification',
+    href: '/advertisement/'
   }
 ]
 
