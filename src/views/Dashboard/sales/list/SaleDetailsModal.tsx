@@ -1,5 +1,7 @@
 'use client'
 
+import { useState } from 'react'
+
 import Dialog from '@mui/material/Dialog'
 import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
@@ -19,8 +21,21 @@ import TableContainer from '@mui/material/TableContainer'
 import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
 import Paper from '@mui/material/Paper'
+import TextField from '@mui/material/TextField'
+import CircularProgress from '@mui/material/CircularProgress'
+import Alert from '@mui/material/Alert'
+import Snackbar from '@mui/material/Snackbar'
 
+import { useQueryClient } from '@tanstack/react-query'
+
+import { useCancelOrder, useSendOrder } from '@/hooks/useSales'
 import type { Order } from '@/types/api/sales'
+
+interface SnackbarMessage {
+  message: string
+  severity: 'success' | 'error' | 'info' | 'warning'
+  key: number
+}
 
 type OrderDetailsModalProps = {
   open: boolean
@@ -35,9 +50,14 @@ const getEstadoColor = (estado: string): 'primary' | 'error' | 'success' | 'warn
     case 'cancelled':
       return 'error'
     case 'paid':
-      return 'success'
     case 'completed':
+      return 'success'
+    case 'confirmed':
       return 'primary'
+    case 'sent':
+      return 'primary'
+    case 'expired':
+      return 'error'
     default:
       return 'primary'
   }
@@ -45,13 +65,26 @@ const getEstadoColor = (estado: string): 'primary' | 'error' | 'success' | 'warn
 
 const getEstadoLabel = (estado: string): string => {
   const labels: Record<string, string> = {
-    pending: 'PENDIENTE',
-    cancelled: 'CANCELADO',
-    paid: 'PAGADO',
-    completed: 'COMPLETADO'
+    pending: 'Pendiente',
+    cancelled: 'Cancelado',
+    paid: 'Pagado',
+    completed: 'Completado',
+    confirmed: 'Confirmado',
+    sent: 'Enviado',
+    expired: 'Expirado'
   }
 
-  return labels[estado] || estado.toUpperCase()
+  return labels[estado] || estado
+}
+
+const getPaymentLabel = (paymentType: string): string => {
+  const labels: Record<string, string> = {
+    cash: 'Efectivo',
+    card: 'Tarjeta',
+    qr: 'QR'
+  }
+
+  return labels[paymentType] || paymentType
 }
 
 const getTipoLabel = (tipo: string): string => {
@@ -71,14 +104,78 @@ const formatDate = (dateString: string): string => {
 }
 
 const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => {
+  const queryClient = useQueryClient()
+  const [dhlCode, setDhlCode] = useState('')
+  const [showDhlInput, setShowDhlInput] = useState(false)
+  const [snackPack, setSnackPack] = useState<SnackbarMessage[]>([])
+  const [messageInfo, setMessageInfo] = useState<SnackbarMessage | undefined>(undefined)
+  const [snackbarOpen, setSnackbarOpen] = useState(false)
+
+  const cancelOrderMutation = useCancelOrder()
+  const sendOrderMutation = useSendOrder()
+
   if (!open || !order) return null
 
-  const handleCancelar = () => {
-    console.log('Cancelar orden:', order.id)
+  const showMessage = (message: string, severity: 'success' | 'error' | 'info' | 'warning') => {
+    setSnackPack(prev => [...prev, { message, severity, key: new Date().getTime() }])
   }
 
-  const handleConfirmar = () => {
-    console.log('Confirmar orden:', order.id)
+  const handleSnackbarClose = (_?: React.SyntheticEvent | Event, reason?: string) => {
+    if (reason === 'clickaway') {
+      return
+    }
+
+    setSnackbarOpen(false)
+  }
+
+  const handleExited = () => {
+    setMessageInfo(undefined)
+  }
+
+  const handleCancelar = async () => {
+    try {
+      await cancelOrderMutation.mutateAsync(order.id)
+      showMessage('Orden cancelada exitosamente', 'success')
+      queryClient.invalidateQueries({ queryKey: ['orders'] })
+      setTimeout(() => {
+        onClose()
+      }, 1500)
+    } catch (error: any) {
+      showMessage(error?.response?.data?.message || 'Error al cancelar la orden', 'error')
+    }
+  }
+
+  const handleSendOrder = async () => {
+    if (order.shipment && !dhlCode.trim()) {
+      showMessage('Por favor ingrese el código DHL', 'warning')
+
+      return
+    }
+
+    try {
+      await sendOrderMutation.mutateAsync({
+        orderId: order.id,
+        dhlCode: order.shipment ? dhlCode.trim() : undefined
+      })
+      showMessage('Orden enviada exitosamente', 'success')
+      queryClient.invalidateQueries({ queryKey: ['orders'] })
+      setShowDhlInput(false)
+      setDhlCode('')
+      setTimeout(() => {
+        onClose()
+      }, 1500)
+    } catch (error: any) {
+      showMessage(error?.response?.data?.message || 'Error al enviar la orden', 'error')
+    }
+  }
+
+  // Handle snackbar queue
+  if (snackPack.length && !messageInfo) {
+    setMessageInfo({ ...snackPack[0] })
+    setSnackPack(prev => prev.slice(1))
+    setSnackbarOpen(true)
+  } else if (snackPack.length && messageInfo && snackbarOpen) {
+    setSnackbarOpen(false)
   }
 
   return (
@@ -121,9 +218,18 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
 
                     <Box>
                       <Typography variant='caption' className='text-textSecondary'>
-                        Fecha de Expiración
+                        Método de Pago
                       </Typography>
-                      <Typography variant='body2'>{formatDate(order.expiresAt)}</Typography>
+                      <Typography variant='body1'>
+                        {order.payment_type ? getPaymentLabel(order.payment_type) : 'N/A'}
+                      </Typography>
+                    </Box>
+
+                    <Box>
+                      <Typography variant='caption' className='text-textSecondary'>
+                        Fecha de Creación
+                      </Typography>
+                      <Typography variant='body2'>{order.createdAt ? formatDate(order.createdAt) : 'N/A'}</Typography>
                     </Box>
                   </Box>
                 </Grid>
@@ -299,31 +405,145 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
       </DialogContent>
 
       <DialogActions className='p-6 pt-0'>
-        <Box className='flex gap-3 w-full justify-end'>
+        <Box className='flex gap-3 w-full justify-end flex-wrap'>
+          {/* Estado: pending - Solo cancelar */}
           {order.status === 'pending' && (
+            <Button
+              variant='contained'
+              color='error'
+              onClick={handleCancelar}
+              disabled={cancelOrderMutation.isPending}
+              startIcon={
+                cancelOrderMutation.isPending ? (
+                  <CircularProgress size={20} color='inherit' />
+                ) : (
+                  <i className='tabler-x' />
+                )
+              }
+            >
+              {cancelOrderMutation.isPending ? 'Cancelando...' : 'Cancelar Orden'}
+            </Button>
+          )}
+
+          {/* Estado: paid - Cancelar y Enviar */}
+          {order.status === 'paid' && (
             <>
-              <Button variant='contained' color='error' onClick={handleCancelar} startIcon={<i className='tabler-x' />}>
-                Cancelar Orden
+              <Button
+                variant='outlined'
+                color='error'
+                onClick={handleCancelar}
+                disabled={cancelOrderMutation.isPending || sendOrderMutation.isPending}
+                startIcon={
+                  cancelOrderMutation.isPending ? (
+                    <CircularProgress size={20} color='inherit' />
+                  ) : (
+                    <i className='tabler-x' />
+                  )
+                }
+              >
+                {cancelOrderMutation.isPending ? 'Cancelando...' : 'Cancelar Orden'}
               </Button>
 
-              <Button
-                variant='contained'
-                color='success'
-                onClick={handleConfirmar}
-                startIcon={<i className='tabler-check' />}
-              >
-                Confirmar Orden
-              </Button>
+              {!showDhlInput && (
+                <Button
+                  variant='contained'
+                  color='primary'
+                  onClick={() => setShowDhlInput(true)}
+                  disabled={cancelOrderMutation.isPending || sendOrderMutation.isPending}
+                  startIcon={<i className='tabler-truck' />}
+                >
+                  Enviar Pedido
+                </Button>
+              )}
+
+              {showDhlInput && (
+                <>
+                  {order.shipment && (
+                    <TextField
+                      size='small'
+                      label='Código DHL'
+                      value={dhlCode}
+                      onChange={e => setDhlCode(e.target.value)}
+                      placeholder='Ej: DHL-123456'
+                      className='max-sm:is-full sm:is-[200px]'
+                      disabled={sendOrderMutation.isPending}
+                    />
+                  )}
+                  <Button
+                    variant='outlined'
+                    onClick={() => {
+                      setShowDhlInput(false)
+                      setDhlCode('')
+                    }}
+                    disabled={sendOrderMutation.isPending}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    variant='contained'
+                    color='success'
+                    onClick={handleSendOrder}
+                    disabled={sendOrderMutation.isPending}
+                    startIcon={
+                      sendOrderMutation.isPending ? (
+                        <CircularProgress size={20} color='inherit' />
+                      ) : (
+                        <i className='tabler-check' />
+                      )
+                    }
+                  >
+                    {sendOrderMutation.isPending ? 'Enviando...' : 'Confirmar Envío'}
+                  </Button>
+                </>
+              )}
             </>
           )}
 
-          {order.status !== 'pending' && (
+          {/* Estado: sent - Solo cancelar */}
+          {order.status === 'sent' && (
+            <Button
+              variant='contained'
+              color='error'
+              onClick={handleCancelar}
+              disabled={cancelOrderMutation.isPending}
+              startIcon={
+                cancelOrderMutation.isPending ? (
+                  <CircularProgress size={20} color='inherit' />
+                ) : (
+                  <i className='tabler-x' />
+                )
+              }
+            >
+              {cancelOrderMutation.isPending ? 'Cancelando...' : 'Cancelar Orden'}
+            </Button>
+          )}
+
+          {/* Otros estados - Solo cerrar */}
+          {!['pending', 'paid', 'sent'].includes(order.status) && (
             <Button variant='outlined' onClick={onClose}>
               Cerrar
             </Button>
           )}
         </Box>
       </DialogActions>
+
+      <Snackbar
+        open={snackbarOpen}
+        onClose={handleSnackbarClose}
+        autoHideDuration={3000}
+        TransitionProps={{ onExited: handleExited }}
+        key={messageInfo ? messageInfo.key : undefined}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          variant='filled'
+          onClose={handleSnackbarClose}
+          className='is-full shadow-xs items-center'
+          severity={messageInfo?.severity || 'info'}
+        >
+          {messageInfo?.message}
+        </Alert>
+      </Snackbar>
     </Dialog>
   )
 }

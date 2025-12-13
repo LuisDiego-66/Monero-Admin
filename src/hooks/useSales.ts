@@ -61,3 +61,14 @@ export const useOrders = (params: OrdersListParams) => {
     refetchOnWindowFocus: true
   })
 }
+
+export const useSendOrder = () => {
+  return useMutation({
+    mutationFn: ({ orderId, dhlCode }: { orderId: number; dhlCode?: string }) =>
+      cartService.sendOrder(orderId, dhlCode),
+    onError: (error: any) => {
+      console.error('Error sending order:', error)
+      throw error
+    }
+  })
+}

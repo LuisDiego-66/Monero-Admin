@@ -1,67 +1,80 @@
-// React Imports
-import { useState, useEffect } from 'react'
+import { MenuItem } from '@mui/material'
 
-// MUI Imports
-import Grid from '@mui/material/Grid2'
-import CardContent from '@mui/material/CardContent'
-import MenuItem from '@mui/material/MenuItem'
-
-// Type Imports
-import type { ProductType } from '@/types/apps/ecommerceTypes'
-
-// Component Imports
 import CustomTextField from '@core/components/mui/TextField'
 
+interface TableFiltersProps {
+  typeFilter: string
+  setTypeFilter: (value: string) => void
+  startDate: string
+  setStartDate: (value: string) => void
+  endDate: string
+  setEndDate: (value: string) => void
+}
+
 const TableFilters = ({
-  setData,
-  productData
-}: {
-  setData: (data: ProductType[]) => void
-  productData?: ProductType[]
-}) => {
-  // States
-  const [tienda, setTienda] = useState<string>('TODOS')
+  typeFilter,
+  setTypeFilter,
+  startDate,
+  setStartDate,
+  endDate,
+  setEndDate
+}: TableFiltersProps) => {
+  const today = new Date().toISOString().split('T')[0]
 
-  const getCategoryTienda = (category: string): string => {
-    if (category === 'Electronics' || category === 'Office' || category === 'Games') {
-      return 'HOMBRES'
+  const handleStartDateChange = (value: string) => {
+    setStartDate(value)
+
+    if (endDate && value && endDate < value) {
+      setEndDate('')
     }
-
-    if (category === 'Accessories' || category === 'Home Decor' || category === 'Shoes') {
-      return 'MUJERES'
-    }
-
-    return 'OTROS'
   }
 
-  useEffect(
-    () => {
-      const filteredData = productData?.filter(product => {
-        if (tienda === 'TODOS') return true
-
-        const productTienda = getCategoryTienda(product.category)
-
-        return productTienda === tienda
-      })
-
-      setData(filteredData ?? [])
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tienda, productData]
-  )
-
   return (
-    <CardContent>
-      <Grid container spacing={6}>
-        <Grid size={{ xs: 12, sm: 4 }}>
-          <CustomTextField select fullWidth id='select-tienda' value={tienda} onChange={e => setTienda(e.target.value)}>
-            <MenuItem value='TODOS'>Todos</MenuItem>
-            <MenuItem value='HOMBRES'>Hombres</MenuItem>
-            <MenuItem value='MUJERES'>Mujeres</MenuItem>
-          </CustomTextField>
-        </Grid>
-      </Grid>
-    </CardContent>
+    <div className='flex flex-wrap gap-4 p-6 pbs-0'>
+      <CustomTextField
+        select
+        fullWidth
+        id='type-filter'
+        value={typeFilter}
+        onChange={e => setTypeFilter(e.target.value)}
+        className='max-sm:is-full sm:is-[200px]'
+        label='Tipo de Venta'
+      >
+        <MenuItem value='all'>Todos</MenuItem>
+        <MenuItem value='in_store'>En Tienda</MenuItem>
+        <MenuItem value='online'>En Línea</MenuItem>
+      </CustomTextField>
+
+      <CustomTextField
+        type='date'
+        fullWidth
+        id='start-date'
+        value={startDate}
+        onChange={e => handleStartDateChange(e.target.value)}
+        className='max-sm:is-full sm:is-[200px]'
+        label='Fecha Inicio'
+        InputLabelProps={{ shrink: true }}
+        inputProps={{
+          max: today
+        }}
+      />
+
+      <CustomTextField
+        type='date'
+        fullWidth
+        id='end-date'
+        value={endDate}
+        onChange={e => setEndDate(e.target.value)}
+        className='max-sm:is-full sm:is-[200px]'
+        label='Fecha Fin'
+        InputLabelProps={{ shrink: true }}
+        disabled={!startDate}
+        inputProps={{
+          min: startDate || undefined,
+          max: today
+        }}
+      />
+    </div>
   )
 }
 

@@ -47,10 +47,12 @@ export interface OrderItem {
 export interface Order {
   id: number
   type: 'in_store' | 'online'
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed'
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'paid' | 'sent' | 'expired'
+  payment_type: 'cash' | 'card' | 'qr'
   enabled: boolean
   totalPrice: string
-  expiresAt: string
+  createdAt: string
+  expiresAt: string | null
   items: OrderItem[]
   customer: any | null
   shipment: any | null
@@ -101,6 +103,9 @@ export interface Variant {
 export interface OrdersListParams {
   page?: number
   limit?: number
+  type?: 'in_store' | 'online' | 'all'
+  startDate?: string
+  endDate?: string
 }
 
 export interface OrdersListMeta {

@@ -3,15 +3,15 @@
 import { useState } from 'react'
 
 import Card from '@mui/material/Card'
+import CardHeader from '@mui/material/CardHeader'
 import Chip from '@mui/material/Chip'
-import MenuItem from '@mui/material/MenuItem'
 import Typography from '@mui/material/Typography'
 import TablePagination from '@mui/material/TablePagination'
 import CircularProgress from '@mui/material/CircularProgress'
 
 import { useOrders } from '@/hooks/useSales'
-import CustomTextField from '@core/components/mui/TextField'
 import OrderDetailsModal from './SaleDetailsModal'
+import TableFilters from './TableFilters'
 import type { Order } from '@/types/api/sales'
 
 const getEstadoColor = (estado: string): 'primary' | 'error' | 'success' | 'warning' => {
@@ -21,9 +21,14 @@ const getEstadoColor = (estado: string): 'primary' | 'error' | 'success' | 'warn
     case 'cancelled':
       return 'error'
     case 'paid':
-      return 'success'
     case 'completed':
+      return 'success'
+    case 'confirmed':
       return 'primary'
+    case 'sent':
+      return 'primary'
+    case 'expired':
+      return 'error'
     default:
       return 'primary'
   }
@@ -31,13 +36,26 @@ const getEstadoColor = (estado: string): 'primary' | 'error' | 'success' | 'warn
 
 const getEstadoLabel = (estado: string): string => {
   const labels: Record<string, string> = {
-    pending: 'PENDIENTE',
-    cancelled: 'CANCELADO',
-    paid: 'PAGADO',
-    completed: 'COMPLETADO'
+    pending: 'Pendiente',
+    cancelled: 'Cancelado',
+    paid: 'Pagado',
+    completed: 'Completado',
+    confirmed: 'Confirmado',
+    sent: 'Enviado',
+    expired: 'Expirado'
   }
 
-  return labels[estado] || estado.toUpperCase()
+  return labels[estado] || estado
+}
+
+const getPaymentLabel = (paymentType: string): string => {
+  const labels: Record<string, string> = {
+    cash: 'Efectivo',
+    card: 'Tarjeta',
+    qr: 'QR'
+  }
+
+  return labels[paymentType] || paymentType
 }
 
 const getTipoLabel = (tipo: string): string => {
@@ -61,10 +79,16 @@ const OrdersListTable = () => {
   const [limit, setLimit] = useState(10)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [typeFilter, setTypeFilter] = useState('all')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
 
   const { data, isLoading, isError } = useOrders({
     page: page + 1,
-    limit
+    limit,
+    type: typeFilter === 'all' ? undefined : (typeFilter as 'in_store' | 'online'),
+    startDate: startDate || undefined,
+    endDate: endDate || undefined
   })
 
   const handleRowClick = (order: Order) => {
@@ -108,16 +132,16 @@ const OrdersListTable = () => {
   return (
     <>
       <Card>
-        <div className='flex flex-wrap justify-between gap-4 p-6'>
-          <Typography variant='h5'>Lista de Ventas</Typography>
-          <div className='flex items-center gap-4'>
-            <CustomTextField select value={limit} onChange={handleChangeRowsPerPage} className='w-[100px]' size='small'>
-              <MenuItem value={10}>10</MenuItem>
-              <MenuItem value={25}>25</MenuItem>
-              <MenuItem value={50}>50</MenuItem>
-            </CustomTextField>
-          </div>
-        </div>
+        <CardHeader title='Lista de Ventas' className='pbe-4' />
+
+        <TableFilters
+          typeFilter={typeFilter}
+          setTypeFilter={setTypeFilter}
+          startDate={startDate}
+          setStartDate={setStartDate}
+          endDate={endDate}
+          setEndDate={setEndDate}
+        />
 
         <div className='overflow-x-auto'>
           <table className='w-full'>
@@ -140,7 +164,12 @@ const OrdersListTable = () => {
                 </th>
                 <th className='text-left p-4'>
                   <Typography variant='body2' className='font-semibold'>
-                    Fecha de Expiración
+                    Método de Pago
+                  </Typography>
+                </th>
+                <th className='text-left p-4'>
+                  <Typography variant='body2' className='font-semibold'>
+                    Fecha de Creación
                   </Typography>
                 </th>
                 <th className='text-left p-4'>
@@ -153,12 +182,17 @@ const OrdersListTable = () => {
                     Items
                   </Typography>
                 </th>
+                <th className='text-left p-4'>
+                  <Typography variant='body2' className='font-semibold'>
+                    Cliente
+                  </Typography>
+                </th>
               </tr>
             </thead>
             <tbody>
               {orders.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className='text-center p-8'>
+                  <td colSpan={8} className='text-center p-8'>
                     <Typography color='text.secondary'>No hay órdenes disponibles</Typography>
                   </td>
                 </tr>
@@ -186,8 +220,13 @@ const OrdersListTable = () => {
                       <Typography variant='body2'>{getTipoLabel(order.type)}</Typography>
                     </td>
                     <td className='p-4'>
+                      <Typography variant='body2'>
+                        {order.payment_type ? getPaymentLabel(order.payment_type) : '-'}
+                      </Typography>
+                    </td>
+                    <td className='p-4'>
                       <Typography variant='body2' color='text.secondary'>
-                        {formatDate(order.expiresAt)}
+                        {order.createdAt ? formatDate(order.createdAt) : '-'}
                       </Typography>
                     </td>
                     <td className='p-4'>
@@ -197,6 +236,11 @@ const OrdersListTable = () => {
                     </td>
                     <td className='p-4'>
                       <Typography variant='body2'>{order.items.length} productos</Typography>
+                    </td>
+                    <td className='p-4'>
+                      <Typography variant='body2' color='text.secondary'>
+                        {order.customer?.name || 'N/A'}
+                      </Typography>
                     </td>
                   </tr>
                 ))
