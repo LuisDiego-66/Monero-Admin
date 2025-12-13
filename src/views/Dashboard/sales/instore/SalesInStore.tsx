@@ -4,36 +4,17 @@ import React, { useState, useMemo, useRef, useEffect } from 'react'
 
 import { useRouter } from 'next/navigation'
 
-import {
-  Grid,
-  Card,
-  CardContent,
-  Typography,
-  TextField,
-  Button,
-  IconButton,
-  Box,
-  Chip,
-  Badge,
-  Paper,
-  InputAdornment,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Alert,
-  CircularProgress,
-  Stepper,
-  Step,
-  StepLabel,
-  LinearProgress,
-  TablePagination
-} from '@mui/material'
+import { Grid, Box, Alert } from '@mui/material'
 
 import { useAddToCart, useRepriceCart, useCreateOrder, useConfirmOrder, useCancelOrder } from '@/hooks/useSales'
 import { useVariants } from '@/hooks/useVariants'
 import type { CartItem, RepriceResponse, Order } from '@/types/api/sales'
 import type { Variant, VariantSize } from '@/types/api/variants'
+import ProductCatalog from './components/ProductCatalog'
+import ShoppingCart from './components/ShoppingCart'
+import PaymentDialog from './components/PaymentDialog'
+import SuccessDialog from './components/SuccessDialog'
+import CancelDialog from './components/CancelDialog'
 
 interface CartItemLocal extends CartItem {
   variantInfo?: any
@@ -479,533 +460,71 @@ const PointOfSale: React.FC = () => {
       <Box sx={{ flex: 1, p: 3, overflow: 'hidden' }}>
         <Grid container spacing={3} sx={{ height: '100%' }}>
           <Grid item xs={12} md={8} sx={{ height: '100%' }}>
-            <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-              <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Typography variant='h6'>Catálogo de Productos</Typography>
-                    <Badge badgeContent={cartItems.length} color='primary'>
-                      <span style={{ fontSize: '1.2em' }}>🛒</span>
-                    </Badge>
-                  </Box>
-                  {cartItems.length > 0 && (
-                    <Box sx={{ flex: 1, maxWidth: '400px', ml: 0 }}>
-                      <Stepper
-                        activeStep={activeStepIndex}
-                        sx={{
-                          p: 0,
-                          justifyContent: 'flex-start',
-                          '& .MuiStep-root': { paddingLeft: 0 },
-                          '& .MuiStepLabel-label': { textAlign: 'left', marginLeft: 0 }
-                        }}
-                      >
-                        {steps.map((label, index) => (
-                          <Step key={index}>
-                            <StepLabel>{label}</StepLabel>
-                          </Step>
-                        ))}
-                      </Stepper>
-                    </Box>
-                  )}
-                </Box>
-                <TextField
-                  fullWidth
-                  placeholder='Buscar producto...'
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position='start'>
-                        <span>🔍</span>
-                      </InputAdornment>
-                    )
-                  }}
-                />
-              </Box>
-              <CardContent sx={{ flex: 1, overflow: 'auto', p: 3 }}>
-                {isLoadingVariants ? (
-                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-                    <CircularProgress />
-                  </Box>
-                ) : flattenedVariants.length === 0 ? (
-                  <Box sx={{ textAlign: 'center', py: 8, color: 'text.secondary' }}>
-                    <Typography sx={{ fontSize: '3rem', mb: 2, opacity: 0.5 }}>🔍</Typography>
-                    <Typography variant='h6'>No se encontraron productos</Typography>
-                  </Box>
-                ) : (
-                  <Grid container spacing={2}>
-                    {flattenedVariants.map(item => (
-                      <Grid item xs={6} sm={4} md={3} lg={2.4} key={`${item.variantSizeId}-${item.colorVariant.id}`}>
-                        <Card
-                          sx={{
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            height: '100%',
-                            opacity: isLoading ? 0.6 : 1,
-                            pointerEvents: isLoading ? 'none' : 'auto',
-                            '&:hover': {
-                              transform: 'translateY(-4px)',
-                              boxShadow: 4
-                            }
-                          }}
-                          onClick={() => addToCart(item)}
-                        >
-                          <CardContent sx={{ textAlign: 'center', p: 2 }}>
-                            <Box
-                              component='img'
-                              src={item.multimedia?.[0] || 'https://via.placeholder.com/150'}
-                              alt={item.displayName}
-                              sx={{
-                                width: 60,
-                                height: 60,
-                                objectFit: 'cover',
-                                borderRadius: 1,
-                                mb: 1,
-                                mx: 'auto',
-                                display: 'block'
-                              }}
-                            />
-                            <Typography variant='body2' fontWeight='bold' sx={{ mb: 1, minHeight: '2.4em' }}>
-                              {item.displayName}
-                            </Typography>
-                            <Chip label={`ID: ${item.variantSizeId}`} size='small' sx={{ mb: 1 }} />
-                            <Box
-                              sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 1 }}
-                            >
-                              <Box
-                                sx={{
-                                  width: 16,
-                                  height: 16,
-                                  borderRadius: '50%',
-                                  bgcolor: item.color?.code || '#ccc',
-                                  border: 1,
-                                  borderColor: 'divider'
-                                }}
-                              />
-                              <Typography variant='caption' color='text.secondary'>
-                                {item.color?.name}
-                              </Typography>
-                            </Box>
-                            <Typography variant='caption' color='text.secondary' display='block' sx={{ mb: 1 }}>
-                              Talla: {item.size}
-                            </Typography>
-                            <Typography variant='h6' color='primary' fontWeight='bold' sx={{ mb: 1 }}>
-                              {item.price ? formatCurrency(item.price) : '-'}
-                            </Typography>
-                            <Chip
-                              label={`Stock: ${item.stock}`}
-                              size='small'
-                              color={item.stock > 10 ? 'success' : item.stock > 0 ? 'warning' : 'error'}
-                            />
-                          </CardContent>
-                        </Card>
-                      </Grid>
-                    ))}
-                  </Grid>
-                )}
-              </CardContent>
-              {flattenedVariants.length > 0 && (
-                <TablePagination
-                  component='div'
-                  count={variantsData?.meta?.total || 0}
-                  page={variantsPage - 1}
-                  onPageChange={handleVariantsPageChange}
-                  rowsPerPage={variantsLimit}
-                  rowsPerPageOptions={[10]}
-                  labelRowsPerPage='Productos por página:'
-                  labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
-                />
-              )}
-            </Card>
+            <ProductCatalog
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              cartItemsCount={cartItems.length}
+              activeStepIndex={activeStepIndex}
+              steps={steps}
+              isLoading={isLoadingVariants || isLoading}
+              variants={flattenedVariants}
+              variantsPage={variantsPage}
+              variantsLimit={variantsLimit}
+              totalVariants={variantsData?.meta?.total || 0}
+              onPageChange={handleVariantsPageChange}
+              onProductClick={addToCart}
+            />
           </Grid>
 
           <Grid item xs={12} md={4} sx={{ height: '100%' }}>
-            <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', maxHeight: '100%' }}>
-              <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Box>
-                    <Typography variant='h6' color='primary' fontWeight='bold'>
-                      CARRITO
-                    </Typography>
-                    {orderData && (
-                      <Typography variant='caption' color='text.secondary'>
-                        Orden #{orderData.id}
-                      </Typography>
-                    )}
-                  </Box>
-                  <IconButton onClick={clearCart} color='error' disabled={isLoading}>
-                    <span>🗑️</span>
-                  </IconButton>
-                </Box>
-              </Box>
-
-              <CardContent sx={{ flex: 1, overflow: 'auto', p: 2, minHeight: 0 }}>
-                {cartItems.length === 0 ? (
-                  <Box sx={{ textAlign: 'center', py: 8, color: 'text.secondary' }}>
-                    <Typography sx={{ fontSize: '3rem', mb: 2, opacity: 0.5 }}>🛒</Typography>
-                    <Typography variant='h6'>Carrito vacío</Typography>
-                    <Typography variant='body2' sx={{ mt: 1 }}>
-                      Agrega productos del catálogo
-                    </Typography>
-                  </Box>
-                ) : (
-                  <Box>
-                    {cartItems.map(item => {
-                      const variantInfo = item.variantInfo
-                      const repriceItem = repriceData?.items.find(ri => ri.variantId === item.variantId)
-
-                      return (
-                        <Card key={item.variantId} sx={{ mb: 1.5 }}>
-                          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                            <Box
-                              sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}
-                            >
-                              <Box sx={{ flex: 1 }}>
-                                <Typography variant='body2' fontWeight='bold'>
-                                  {variantInfo?.displayName || 'Producto'}
-                                </Typography>
-                                <Typography variant='caption' color='text.secondary' fontSize='0.7rem'>
-                                  {variantInfo?.size} | {variantInfo?.color?.name}
-                                </Typography>
-                              </Box>
-                              {currentStep === 'BUILDING_CART' && (
-                                <IconButton
-                                  size='small'
-                                  color='error'
-                                  onClick={() => removeFromCart(item.variantId)}
-                                  disabled={isLoading}
-                                  sx={{ p: 0.5 }}
-                                >
-                                  <span style={{ fontSize: '0.9rem' }}>🗑️</span>
-                                </IconButton>
-                              )}
-                            </Box>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
-                              {currentStep === 'BUILDING_CART' ? (
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                  <IconButton
-                                    size='small'
-                                    onClick={() => updateQuantity(item.variantId, item.quantity - 1)}
-                                    disabled={isLoading}
-                                    sx={{ p: 0.5 }}
-                                  >
-                                    <span style={{ fontSize: '0.8rem' }}>➖</span>
-                                  </IconButton>
-                                  <Typography
-                                    variant='body2'
-                                    fontWeight='bold'
-                                    sx={{ minWidth: 24, textAlign: 'center' }}
-                                  >
-                                    {item.quantity}
-                                  </Typography>
-                                  <IconButton
-                                    size='small'
-                                    onClick={() => updateQuantity(item.variantId, item.quantity + 1)}
-                                    disabled={isLoading}
-                                    sx={{ p: 0.5 }}
-                                  >
-                                    <span style={{ fontSize: '0.8rem' }}>➕</span>
-                                  </IconButton>
-                                </Box>
-                              ) : (
-                                <Typography variant='body2' fontWeight='bold'>
-                                  Cant: {item.quantity}
-                                </Typography>
-                              )}
-                              <Box sx={{ textAlign: 'right' }}>
-                                <Typography variant='caption' color='text.secondary' display='block' fontSize='0.65rem'>
-                                  {repriceItem
-                                    ? formatCurrency(repriceItem.unit_price)
-                                    : variantInfo?.price
-                                      ? formatCurrency(variantInfo.price)
-                                      : '-'}{' '}
-                                  c/u
-                                </Typography>
-                                <Typography variant='body1' color='primary' fontWeight='bold'>
-                                  {repriceItem
-                                    ? formatCurrency(repriceItem.totalPrice)
-                                    : variantInfo?.price
-                                      ? formatCurrency(variantInfo.price * item.quantity)
-                                      : '-'}
-                                </Typography>
-                              </Box>
-                            </Box>
-                          </CardContent>
-                        </Card>
-                      )
-                    })}
-                  </Box>
-                )}
-              </CardContent>
-
-              {cartItems.length > 0 && (
-                <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider', bgcolor: 'background.paper' }}>
-                  <Paper sx={{ p: 1.5, mb: 1.5, bgcolor: 'action.hover' }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Typography variant='body1' fontWeight='bold'>
-                        Total:
-                      </Typography>
-                      <Typography variant='h6' fontWeight='bold' color='primary'>
-                        {repriceData
-                          ? `Bs ${localTotals.total.toFixed(2)}`
-                          : `Bs ${cartItems
-                              .reduce((sum, item) => {
-                                const variantInfo = item.variantInfo
-                                const price = variantInfo?.price || 0
-
-                                return sum + price * item.quantity
-                              }, 0)
-                              .toFixed(2)}`}
-                      </Typography>
-                    </Box>
-                    {!repriceData && (
-                      <Typography
-                        variant='caption'
-                        color='text.secondary'
-                        sx={{ display: 'block', mt: 0.5, textAlign: 'right', fontSize: '0.65rem' }}
-                      >
-                        *Estimado (sujeto a verificación)
-                      </Typography>
-                    )}
-                  </Paper>
-                  {currentStep === 'BUILDING_CART' ? (
-                    <Button
-                      variant='contained'
-                      fullWidth
-                      size='medium'
-                      onClick={verifyStockAndPrices}
-                      disabled={cartItems.length === 0 || isLoading}
-                      startIcon={isLoading ? <CircularProgress size={18} color='inherit' /> : <span>✓</span>}
-                      sx={{ py: 1 }}
-                    >
-                      {isLoading ? 'Procesando...' : 'Proceder al pago'}
-                    </Button>
-                  ) : (
-                    <Alert severity='info' sx={{ py: 0.5 }}>
-                      <Typography variant='caption'>
-                        {currentStep === 'VERIFYING_STOCK' && 'Verificando disponibilidad...'}
-                        {currentStep === 'ORDER_CREATED' && 'Orden creada, seleccione método de pago'}
-                        {currentStep === 'PAYMENT' && 'Procesando pago...'}
-                      </Typography>
-                    </Alert>
-                  )}
-                </Box>
-              )}
-            </Card>
+            <ShoppingCart
+              cartItems={cartItems}
+              orderData={orderData}
+              repriceData={repriceData}
+              currentStep={currentStep}
+              isLoading={isLoading}
+              onClearCart={clearCart}
+              onRemoveItem={removeFromCart}
+              onUpdateQuantity={updateQuantity}
+              onProceedToPayment={verifyStockAndPrices}
+            />
           </Grid>
         </Grid>
       </Box>
 
-      <Dialog
+      <PaymentDialog
         open={showPaymentDialog}
-        onClose={handleClosePaymentDialog}
-        maxWidth='sm'
-        fullWidth
-        disableEscapeKeyDown={currentStep === 'ORDER_CREATED'}
-      >
-        <DialogTitle>
-          <Typography variant='h5' fontWeight='bold'>
-            {orderData ? `Método de Pago - Orden #${orderData.id}` : 'Seleccione Método de Pago'}
-          </Typography>
-        </DialogTitle>
-        <DialogContent>
-          {orderExpiresAt && timeRemaining > 0 && orderData && (
-            <Paper sx={{ p: 2, mb: 3, bgcolor: 'warning.lighter', border: 1, borderColor: 'warning.main' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                <Typography variant='body1' fontWeight='bold' color='warning.dark'>
-                  ⏱️ Tiempo restante: {formatTime(timeRemaining)}
-                </Typography>
-                <Typography variant='caption' color='text.secondary'>
-                  {timeRemaining < 60 ? '¡Apúrate!' : 'Stock reservado'}
-                </Typography>
-              </Box>
-              <LinearProgress
-                variant='determinate'
-                value={timerProgress}
-                sx={{
-                  height: 8,
-                  borderRadius: 4,
-                  '& .MuiLinearProgress-bar': {
-                    bgcolor: timeRemaining < 60 ? 'error.main' : 'warning.main'
-                  }
-                }}
-              />
-            </Paper>
-          )}
+        orderData={orderData}
+        repriceData={repriceData}
+        selectedPayment={selectedPayment}
+        timeRemaining={timeRemaining}
+        timerProgress={timerProgress}
+        currentStep={currentStep}
+        isLoading={isLoading}
+        paymentMethods={paymentMethods}
+        onClose={handleCloseWithoutOrder}
+        onPaymentSelect={handlePaymentMethodSelect}
+        onConfirmPayment={confirmPayment}
+        onCancelOrder={() => setShowCancelDialog(true)}
+      />
 
-          <Paper sx={{ p: 3, mb: 3, textAlign: 'center', bgcolor: 'primary.lighter' }}>
-            <Typography variant='h4' color='primary' fontWeight='bold'>
-              Total a pagar:{' '}
-              {orderData
-                ? formatCurrency(orderData.totalPrice)
-                : repriceData
-                  ? `Bs ${parseFloat(repriceData.total).toFixed(2)}`
-                  : 'Bs 0.00'}
-            </Typography>
-          </Paper>
+      <CancelDialog
+        open={showCancelDialog}
+        orderData={orderData}
+        isLoading={isLoading}
+        onClose={() => setShowCancelDialog(false)}
+        onConfirm={handleCancelOrder}
+      />
 
-          <Grid container spacing={2}>
-            {paymentMethods.map(method => (
-              <Grid item xs={6} key={method.id}>
-                <Card
-                  sx={{
-                    cursor: 'pointer',
-                    border: 2,
-                    borderColor: selectedPayment === method.id ? method.color : 'divider',
-                    textAlign: 'center',
-                    transition: 'all 0.2s',
-                    '&:hover': {
-                      borderColor: method.color,
-                      boxShadow: 2
-                    }
-                  }}
-                  onClick={() => !isLoading && handlePaymentMethodSelect(method.id as 'cash' | 'card' | 'qr')}
-                >
-                  <CardContent>
-                    <Box sx={{ fontSize: '3rem', mb: 1 }}>{method.icon}</Box>
-                    <Typography variant='h6' fontWeight='medium'>
-                      {method.name}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
-
-          {selectedPayment === 'qr' && (
-            <Paper sx={{ p: 4, mt: 3, textAlign: 'center', bgcolor: 'action.hover' }}>
-              <QRCodeSVG />
-              <Typography variant='h6' sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>
-                Escanea para pagar
-              </Typography>
-              <Typography variant='h5' color='primary' fontWeight='bold'>
-                {orderData && formatCurrency(orderData.totalPrice)}
-              </Typography>
-            </Paper>
-          )}
-
-          {selectedPayment === 'cash' && (
-            <Paper sx={{ p: 4, mt: 3, textAlign: 'center', bgcolor: 'success.lighter' }}>
-              <Typography sx={{ fontSize: '4rem', mb: 2 }}>💵</Typography>
-              <Typography variant='h6' fontWeight='bold'>
-                Pago en Efectivo
-              </Typography>
-            </Paper>
-          )}
-
-          {selectedPayment === 'card' && (
-            <Paper sx={{ p: 4, mt: 3, textAlign: 'center', bgcolor: 'info.lighter' }}>
-              <Typography sx={{ fontSize: '4rem', mb: 2 }}>💳</Typography>
-              <Typography variant='h6' fontWeight='bold'>
-                Pago con Tarjeta
-              </Typography>
-            </Paper>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ p: 3, gap: 2 }}>
-          {!orderData ? (
-            <Button onClick={handleCloseWithoutOrder} variant='outlined' fullWidth>
-              Cerrar
-            </Button>
-          ) : (
-            <>
-              <Button
-                onClick={() => setShowCancelDialog(true)}
-                color='error'
-                variant='outlined'
-                disabled={isLoading || currentStep === 'PAYMENT'}
-                fullWidth
-              >
-                Cancelar Orden
-              </Button>
-              <Button
-                variant='contained'
-                onClick={confirmPayment}
-                disabled={!orderData || isLoading || (!!orderData && timeRemaining === 0)}
-                startIcon={isLoading ? <CircularProgress size={20} color='inherit' /> : <span>💳</span>}
-                fullWidth
-              >
-                {isLoading ? 'Procesando...' : 'Confirmar Pago'}
-              </Button>
-            </>
-          )}
-        </DialogActions>
-      </Dialog>
-
-      <Dialog open={showCancelDialog} onClose={() => setShowCancelDialog(false)} maxWidth='xs' fullWidth>
-        <DialogTitle>
-          <Typography variant='h6' fontWeight='bold'>
-            ¿Cancelar Orden?
-          </Typography>
-        </DialogTitle>
-        <DialogContent>
-          <Typography>
-            ¿Estás seguro que deseas cancelar la orden #{orderData?.id}? El stock reservado será liberado
-            inmediatamente.
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ p: 2, gap: 1 }}>
-          <Button onClick={() => setShowCancelDialog(false)} disabled={isLoading} variant='outlined' fullWidth>
-            No, Continuar
-          </Button>
-          <Button
-            onClick={handleCancelOrder}
-            color='error'
-            variant='contained'
-            disabled={isLoading}
-            startIcon={isLoading ? <CircularProgress size={20} color='inherit' /> : null}
-            fullWidth
-          >
-            {isLoading ? 'Cancelando...' : 'Sí, Cancelar'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog open={showSuccessDialog} maxWidth='xs' fullWidth disableEscapeKeyDown>
-        <DialogTitle>
-          <Box sx={{ textAlign: 'center' }}>
-            <Typography sx={{ fontSize: '3.5rem', mb: 1 }}>✅</Typography>
-            <Typography variant='h5' fontWeight='bold' color='success.main'>
-              ¡Venta Completada!
-            </Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          <Box sx={{ textAlign: 'center', py: 2 }}>
-            <Typography variant='body1' color='text.secondary' gutterBottom>
-              La venta se realizó exitosamente
-            </Typography>
-            {orderData && (
-              <Typography variant='h6' fontWeight='bold' color='primary' sx={{ mt: 2 }}>
-                Orden #{orderData.id}
-              </Typography>
-            )}
-          </Box>
-        </DialogContent>
-        <DialogActions sx={{ p: 3, gap: 2, flexDirection: 'column' }}>
-          <Button
-            variant='contained'
-            fullWidth
-            size='large'
-            onClick={() => {
-              setShowSuccessDialog(false)
-              clearCart()
-            }}
-          >
-            Aceptar
-          </Button>
-          <Button
-            variant='outlined'
-            fullWidth
-            size='large'
-            onClick={() => {
-              router.push('/sales/list')
-            }}
-          >
-            Ver lista de ventas
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <SuccessDialog
+        open={showSuccessDialog}
+        orderData={orderData}
+        onAccept={() => {
+          setShowSuccessDialog(false)
+          clearCart()
+        }}
+        onViewSales={() => router.push('/sales/list')}
+      />
     </Box>
   )
 }
