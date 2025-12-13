@@ -16,7 +16,7 @@ import {
   LinearProgress
 } from '@mui/material'
 
-import type { Order, RepriceResponse } from '@/types/api/sales'
+import type { Order, RepriceResponse, GenerateQRResponse } from '@/types/api/sales'
 
 interface PaymentMethod {
   id: string
@@ -35,26 +35,12 @@ interface PaymentDialogProps {
   currentStep: string
   isLoading: boolean
   paymentMethods: PaymentMethod[]
+  qrData: GenerateQRResponse | null // Datos del QR generado
   onClose: () => void
   onPaymentSelect: (paymentType: 'cash' | 'card' | 'qr') => void
   onConfirmPayment: () => void
   onCancelOrder: () => void
 }
-
-const QRCodeSVG = () => (
-  <svg width='200' height='200' viewBox='0 0 200 200' fill='none' xmlns='http://www.w3.org/2000/svg'>
-    <rect width='200' height='200' fill='white' />
-    <rect x='10' y='10' width='60' height='60' fill='black' />
-    <rect x='20' y='20' width='40' height='40' fill='white' />
-    <rect x='30' y='30' width='20' height='20' fill='black' />
-    <rect x='130' y='10' width='60' height='60' fill='black' />
-    <rect x='140' y='20' width='40' height='40' fill='white' />
-    <rect x='150' y='30' width='20' height='20' fill='black' />
-    <rect x='10' y='130' width='60' height='60' fill='black' />
-    <rect x='20' y='140' width='40' height='40' fill='white' />
-    <rect x='30' y='150' width='20' height='20' fill='black' />
-  </svg>
-)
 
 const PaymentDialog: React.FC<PaymentDialogProps> = ({
   open,
@@ -66,6 +52,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   currentStep,
   isLoading,
   paymentMethods,
+  qrData,
   onClose,
   onPaymentSelect,
   onConfirmPayment,
@@ -99,33 +86,32 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
       <DialogTitle>
         <Typography variant='h5' fontWeight='bold'>
           {orderData ? `Método de Pago - Orden #${orderData.id}` : 'Seleccione Método de Pago'}
+          {timeRemaining > 0 && orderData && (
+            <Paper sx={{ p: 2, mb: 3, bgcolor: 'warning.lighter', border: 1, borderColor: 'warning.main' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                <Typography variant='body1' fontWeight='bold' color='warning.dark'>
+                  ⏱️ Tiempo restante: {formatTime(timeRemaining)}
+                </Typography>
+                <Typography variant='caption' color='text.secondary'>
+                  {timeRemaining < 60 ? '¡Cancela antes del tiempo limite!' : 'Stock reservado'}
+                </Typography>
+              </Box>
+              <LinearProgress
+                variant='determinate'
+                value={timerProgress}
+                sx={{
+                  height: 8,
+                  borderRadius: 4,
+                  '& .MuiLinearProgress-bar': {
+                    bgcolor: timeRemaining < 60 ? 'error.main' : 'warning.main'
+                  }
+                }}
+              />
+            </Paper>
+          )}
         </Typography>
       </DialogTitle>
       <DialogContent>
-        {timeRemaining > 0 && orderData && (
-          <Paper sx={{ p: 2, mb: 3, bgcolor: 'warning.lighter', border: 1, borderColor: 'warning.main' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Typography variant='body1' fontWeight='bold' color='warning.dark'>
-                ⏱️ Tiempo restante: {formatTime(timeRemaining)}
-              </Typography>
-              <Typography variant='caption' color='text.secondary'>
-                {timeRemaining < 60 ? '¡Apúrate!' : 'Stock reservado'}
-              </Typography>
-            </Box>
-            <LinearProgress
-              variant='determinate'
-              value={timerProgress}
-              sx={{
-                height: 8,
-                borderRadius: 4,
-                '& .MuiLinearProgress-bar': {
-                  bgcolor: timeRemaining < 60 ? 'error.main' : 'warning.main'
-                }
-              }}
-            />
-          </Paper>
-        )}
-
         <Paper sx={{ p: 3, mb: 3, textAlign: 'center', bgcolor: 'primary.lighter' }}>
           <Typography variant='h4' color='primary' fontWeight='bold'>
             Total a pagar:{' '}
@@ -165,15 +151,49 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
           ))}
         </Grid>
 
+        {/* Sección de pago con QR */}
         {selectedPayment === 'qr' && (
           <Paper sx={{ p: 4, mt: 3, textAlign: 'center', bgcolor: 'action.hover' }}>
-            <QRCodeSVG />
-            <Typography variant='h6' sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>
-              Escanea para pagar
-            </Typography>
-            <Typography variant='h5' color='primary' fontWeight='bold'>
-              {orderData && formatCurrency(orderData.totalPrice)}
-            </Typography>
+            {qrData && qrData.qr ? (
+              <>
+                {/* Mostrar QR generado desde el backend (base64) */}
+                <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+                  <img
+                    src={qrData.qr.startsWith('data:') ? qrData.qr : `data:image/png;base64,${qrData.qr}`}
+                    alt='Código QR para pago'
+                    style={{
+                      width: '300px',
+                      height: '300px',
+                      objectFit: 'contain',
+                      border: '2px solid #ddd',
+                      borderRadius: '8px',
+                      backgroundColor: 'white'
+                    }}
+                  />
+                </Box>
+                <Typography variant='h6' sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>
+                  Escanea para pagar
+                </Typography>
+                <Typography variant='h5' color='primary' fontWeight='bold'>
+                  {orderData && formatCurrency(orderData.totalPrice)}
+                </Typography>
+
+                <Box sx={{ mt: 2 }}>
+                  <CircularProgress size={24} />
+                  <Typography variant='body2' color='text.secondary' sx={{ mt: 1 }}>
+                    Esperando confirmación de pago...
+                  </Typography>
+                </Box>
+              </>
+            ) : (
+              <>
+                {/* Mostrar mientras se genera el QR */}
+                <CircularProgress size={60} />
+                <Typography variant='h6' sx={{ mt: 2, fontWeight: 'bold' }}>
+                  Generando código QR...
+                </Typography>
+              </>
+            )}
           </Paper>
         )}
 
@@ -202,24 +222,29 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
           </Button>
         ) : (
           <>
+            {/* Botón Cancelar Orden */}
             <Button
               onClick={onCancelOrder}
               color='error'
               variant='outlined'
-              disabled={isLoading || currentStep === 'PAYMENT'}
+              disabled={isLoading || (currentStep === 'PAYMENT' && selectedPayment !== 'qr')}
               fullWidth
             >
               Cancelar Orden
             </Button>
-            <Button
-              variant='contained'
-              onClick={onConfirmPayment}
-              disabled={!orderData || isLoading || (!!orderData && timeRemaining === 0)}
-              startIcon={isLoading ? <CircularProgress size={20} color='inherit' /> : <span>💳</span>}
-              fullWidth
-            >
-              {isLoading ? 'Procesando...' : 'Confirmar Pago'}
-            </Button>
+
+            {/* Botón Confirmar Pago - Solo para efectivo y tarjeta */}
+            {selectedPayment !== 'qr' && (
+              <Button
+                variant='contained'
+                onClick={onConfirmPayment}
+                disabled={!orderData || isLoading || (!!orderData && timeRemaining === 0)}
+                startIcon={isLoading ? <CircularProgress size={20} color='inherit' /> : <span>💳</span>}
+                fullWidth
+              >
+                {isLoading ? 'Procesando...' : 'Confirmar Pago'}
+              </Button>
+            )}
           </>
         )}
       </DialogActions>

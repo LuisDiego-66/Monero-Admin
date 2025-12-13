@@ -11,7 +11,10 @@ import type {
   ConfirmOrderResponse,
   CancelOrderResponse,
   OrdersListParams,
-  OrdersListResponse
+  OrdersListResponse,
+  GenerateQRRequest,
+  GenerateQRResponse,
+  VerifyPaymentResponse
 } from '@/types/api/sales'
 
 class CartServiceClass {
@@ -66,6 +69,20 @@ class CartServiceClass {
   async sendOrder(orderId: number, dhlCode?: string): Promise<Order> {
     const payload = dhlCode ? { dhl_code: dhlCode } : {}
     const response = await apiClient.patch<Order>(`/api/orders/${orderId}`, payload)
+
+    return response.data
+  }
+
+  // Generar código QR para pago
+  async generateQR(data: GenerateQRRequest): Promise<GenerateQRResponse> {
+    const response = await apiClient.post<GenerateQRResponse>('/api/payments/generate-qr', data)
+
+    return response.data
+  }
+
+  // Verificar si el pago con QR fue completado
+  async verifyPayment(paymentId: string): Promise<VerifyPaymentResponse> {
+    const response = await apiClient.get<VerifyPaymentResponse>(`/api/payments/verify/${paymentId}`)
 
     return response.data
   }

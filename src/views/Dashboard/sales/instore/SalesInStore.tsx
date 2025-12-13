@@ -6,9 +6,17 @@ import { useRouter } from 'next/navigation'
 
 import { Grid, Box, Alert } from '@mui/material'
 
-import { useAddToCart, useRepriceCart, useCreateOrder, useConfirmOrder, useCancelOrder } from '@/hooks/useSales'
+import {
+  useAddToCart,
+  useRepriceCart,
+  useCreateOrder,
+  useConfirmOrder,
+  useCancelOrder,
+  useGenerateQR,
+  useVerifyPayment
+} from '@/hooks/useSales'
 import { useVariants } from '@/hooks/useVariants'
-import type { CartItem, RepriceResponse, Order } from '@/types/api/sales'
+import type { CartItem, RepriceResponse, Order, GenerateQRResponse } from '@/types/api/sales'
 import type { Variant, VariantSize } from '@/types/api/variants'
 import ProductCatalog from './components/ProductCatalog'
 import ShoppingCart from './components/ShoppingCart'
@@ -37,21 +45,6 @@ const paymentMethods: PaymentMethod[] = [
 
 const steps = ['Armando Carrito', 'Verificando Stock', 'Orden Creada', 'Procesando Pago']
 
-const QRCodeSVG = () => (
-  <svg width='200' height='200' viewBox='0 0 200 200' fill='none' xmlns='http://www.w3.org/2000/svg'>
-    <rect width='200' height='200' fill='white' />
-    <rect x='10' y='10' width='60' height='60' fill='black' />
-    <rect x='20' y='20' width='40' height='40' fill='white' />
-    <rect x='30' y='30' width='20' height='20' fill='black' />
-    <rect x='130' y='10' width='60' height='60' fill='black' />
-    <rect x='140' y='20' width='40' height='40' fill='white' />
-    <rect x='150' y='30' width='20' height='20' fill='black' />
-    <rect x='10' y='130' width='60' height='60' fill='black' />
-    <rect x='20' y='140' width='40' height='40' fill='white' />
-    <rect x='30' y='150' width='20' height='20' fill='black' />
-  </svg>
-)
-
 const PointOfSale: React.FC = () => {
   const router = useRouter()
   const [searchTerm, setSearchTerm] = useState('')
@@ -72,6 +65,10 @@ const PointOfSale: React.FC = () => {
   const [variantsPage, setVariantsPage] = useState(1)
   const [variantsLimit] = useState(10)
 
+  // Estados para el flujo de pago con QR
+  const [qrData, setQrData] = useState<GenerateQRResponse | null>(null)
+  const [isVerifyingPayment, setIsVerifyingPayment] = useState(false)
+
   const debounceTimerRef = useRef<NodeJS.Timeout>()
   const timerIntervalRef = useRef<NodeJS.Timeout>()
   const skipDebounceRef = useRef(false)
@@ -81,6 +78,11 @@ const PointOfSale: React.FC = () => {
   const createOrderMutation = useCreateOrder()
   const confirmOrderMutation = useConfirmOrder()
   const cancelOrderMutation = useCancelOrder()
+
+  const generateQRMutation = useGenerateQR()
+
+  // Query para verificar el pago QR usando el Order ID
+  const { data: paymentVerification } = useVerifyPayment(orderData?.id ? String(orderData.id) : '', isVerifyingPayment)
 
   const { data: variantsData, isLoading: isLoadingVariants } = useVariants(variantsPage, variantsLimit, debouncedSearch)
 
@@ -104,7 +106,6 @@ const PointOfSale: React.FC = () => {
       return
     }
 
-    // Si acabamos de limpiar después de un QR, no hacer nada
     if (skipDebounceRef.current && searchTerm === '') {
       skipDebounceRef.current = false
 
@@ -143,6 +144,28 @@ const PointOfSale: React.FC = () => {
       }
     }
   }, [orderExpiresAt])
+
+  // Efecto para detectar cuando el pago con QR ha sido verificado exitosamente
+  useEffect(() => {
+    const isPaid =
+      paymentVerification === true ||
+      (typeof paymentVerification === 'object' &&
+        paymentVerification !== null &&
+        'paid' in paymentVerification &&
+        paymentVerification.paid === true)
+
+    if (isPaid && isVerifyingPayment) {
+      // Pago verificado exitosamente
+      setIsVerifyingPayment(false)
+      setCurrentStep('COMPLETED')
+      setShowPaymentDialog(false)
+      setShowSuccessDialog(true)
+
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current)
+      }
+    }
+  }, [paymentVerification, isVerifyingPayment])
 
   const flattenedVariants = useMemo(() => {
     if (!variantsData?.data) return []
@@ -240,6 +263,10 @@ const PointOfSale: React.FC = () => {
     setTimeRemaining(0)
     setOrderExpiresAt(null)
 
+    // Limpiar datos del QR y detener verificación
+    setQrData(null)
+    setIsVerifyingPayment(false)
+
     if (timerIntervalRef.current) {
       clearInterval(timerIntervalRef.current)
     }
@@ -300,6 +327,38 @@ const PointOfSale: React.FC = () => {
     setSelectedPayment(paymentType)
 
     if (orderData) {
+      // Si ya existe una orden y seleccionamos QR, generar el código QR inmediatamente
+      if (paymentType === 'qr') {
+        try {
+          setErrorMessage('')
+          setCurrentStep('PAYMENT')
+          setActiveStepIndex(3)
+
+          const qrResponse = await generateQRMutation.mutateAsync({
+            orderId: orderData.id,
+            gloss: 'PAGO TIENDA MONERO'
+          })
+
+          setQrData(qrResponse)
+          setIsVerifyingPayment(true)
+
+          const expirationDate = new Date()
+
+          expirationDate.setMinutes(expirationDate.getMinutes() + 15)
+          setOrderExpiresAt(expirationDate)
+        } catch (error: any) {
+          setErrorMessage(error?.response?.data?.message || 'Error al generar código QR')
+          setCurrentStep('ORDER_CREATED')
+          setActiveStepIndex(2)
+          setSelectedPayment('')
+        }
+      } else {
+        const expirationDate = new Date()
+
+        expirationDate.setMinutes(expirationDate.getMinutes() + 25)
+        setOrderExpiresAt(expirationDate)
+      }
+
       return
     }
 
@@ -315,10 +374,28 @@ const PointOfSale: React.FC = () => {
 
       setOrderData(order)
 
-      if (order.expiresAt) {
-        const expirationDate = new Date(order.expiresAt)
+      const expirationDate = new Date()
 
-        setOrderExpiresAt(expirationDate)
+      if (paymentType === 'qr') {
+        expirationDate.setMinutes(expirationDate.getMinutes() + 15) // 15 min para QR
+      } else {
+        expirationDate.setMinutes(expirationDate.getMinutes() + 25) // 25 min para efectivo/tarjeta
+      }
+
+      setOrderExpiresAt(expirationDate)
+
+      // Si el método de pago es QR, generar el código QR automáticamente
+      if (paymentType === 'qr') {
+        setCurrentStep('PAYMENT')
+        setActiveStepIndex(3)
+
+        const qrResponse = await generateQRMutation.mutateAsync({
+          orderId: order.id,
+          gloss: 'PAGO TIENDA MONERO'
+        })
+
+        setQrData(qrResponse)
+        setIsVerifyingPayment(true)
       }
     } catch (error: any) {
       setErrorMessage(error?.response?.data?.message || 'Error al crear la orden')
@@ -354,6 +431,8 @@ const PointOfSale: React.FC = () => {
       }
     } catch (error: any) {
       setErrorMessage(error?.response?.data?.message || 'Error al procesar el pago')
+      setCurrentStep('ORDER_CREATED')
+      setActiveStepIndex(2)
     }
   }
 
@@ -415,6 +494,10 @@ const PointOfSale: React.FC = () => {
     setTimeRemaining(0)
     setOrderExpiresAt(null)
 
+    // Limpiar datos del QR y detener verificación al cerrar sin orden
+    setQrData(null)
+    setIsVerifyingPayment(false)
+
     if (timerIntervalRef.current) {
       clearInterval(timerIntervalRef.current)
     }
@@ -437,13 +520,14 @@ const PointOfSale: React.FC = () => {
     repriceMutation.isPending ||
     createOrderMutation.isPending ||
     confirmOrderMutation.isPending ||
-    cancelOrderMutation.isPending
+    cancelOrderMutation.isPending ||
+    generateQRMutation.isPending
 
   const handleVariantsPageChange = (_: unknown, newPage: number) => {
     setVariantsPage(newPage + 1)
   }
 
-  const timerProgress = orderExpiresAt ? (timeRemaining / (15 * 60)) * 100 : 100
+  const timerProgress = orderExpiresAt ? (timeRemaining / (selectedPayment === 'qr' ? 15 * 60 : 25 * 60)) * 100 : 100
 
   return (
     <Box
@@ -492,6 +576,7 @@ const PointOfSale: React.FC = () => {
         </Grid>
       </Box>
 
+      {/* Diálogo de pago - Incluye soporte para QR dinámico */}
       <PaymentDialog
         open={showPaymentDialog}
         orderData={orderData}
@@ -502,6 +587,7 @@ const PointOfSale: React.FC = () => {
         currentStep={currentStep}
         isLoading={isLoading}
         paymentMethods={paymentMethods}
+        qrData={qrData}
         onClose={handleCloseWithoutOrder}
         onPaymentSelect={handlePaymentMethodSelect}
         onConfirmPayment={confirmPayment}

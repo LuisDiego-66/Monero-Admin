@@ -1,7 +1,13 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 
 import { cartService } from '@/services/salesService'
-import type { CartRequest, CreateOrderRequest, ConfirmOrderRequest, OrdersListParams } from '@/types/api/sales'
+import type {
+  CartRequest,
+  CreateOrderRequest,
+  ConfirmOrderRequest,
+  OrdersListParams,
+  GenerateQRRequest
+} from '@/types/api/sales'
 
 export const useAddToCart = () => {
   return useMutation({
@@ -70,5 +76,28 @@ export const useSendOrder = () => {
       console.error('Error sending order:', error)
       throw error
     }
+  })
+}
+
+// Hook para generar QR de pago
+export const useGenerateQR = () => {
+  return useMutation({
+    mutationFn: (data: GenerateQRRequest) => cartService.generateQR(data),
+    onError: (error: any) => {
+      console.error('Error generating QR:', error)
+      throw error
+    }
+  })
+}
+
+// Hook para verificar pago QR
+export const useVerifyPayment = (paymentId: string, enabled: boolean = false) => {
+  return useQuery({
+    queryKey: ['verify-payment', paymentId],
+    queryFn: () => cartService.verifyPayment(paymentId),
+    enabled: enabled && !!paymentId,
+    refetchInterval: 3000, // Polling cada 3 segundos
+    refetchIntervalInBackground: true,
+    retry: false
   })
 }

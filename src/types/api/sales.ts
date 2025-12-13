@@ -122,3 +122,26 @@ export interface OrdersListResponse {
   data: Order[]
   meta: OrdersListMeta
 }
+
+// Tipos para el flujo de pago con QR
+export interface GenerateQRRequest {
+  orderId: number
+  gloss: string
+}
+
+export interface GenerateQRResponse {
+  id: string
+  qr: string // Base64 del QR code
+  success: boolean
+  message: string
+  gloss: string
+  orderId: number
+}
+
+export type VerifyPaymentResponse =
+  | boolean
+  | {
+      success: boolean
+      paid: boolean
+      message?: string
+    }
