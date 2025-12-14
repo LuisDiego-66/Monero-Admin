@@ -1,7 +1,9 @@
 // Type Imports
 import type { VerticalMenuDataType } from '@/types/menuTypes'
+import { authService } from '@/services/authService'
+import { filterMenuByRole } from '@/utils/menuPermissions'
 
-const verticalMenuData = (): VerticalMenuDataType[] => [
+const getFullMenuData = (): VerticalMenuDataType[] => [
   // Dashboard
   {
     isSection: true,
@@ -13,7 +15,7 @@ const verticalMenuData = (): VerticalMenuDataType[] => [
     href: '/home'
   },
 
-  // MÓDULO USUARIOS
+  // MÓDULO CLIENTES
   {
     isSection: true,
     label: 'MÓDULO CLIENTES'
@@ -142,7 +144,7 @@ const verticalMenuData = (): VerticalMenuDataType[] => [
     ]
   },
 
-  // Dashboard
+  // MÓDULO ANUNCIOS
   {
     isSection: true,
     label: 'Anuncios'
@@ -153,5 +155,13 @@ const verticalMenuData = (): VerticalMenuDataType[] => [
     href: '/advertisement/'
   }
 ]
+
+const verticalMenuData = (): VerticalMenuDataType[] => {
+  const userEmail = authService.getUserEmail()
+  const fullMenu = getFullMenuData()
+
+  // Filtrar el menú basado en el rol del usuario
+  return filterMenuByRole(fullMenu, userEmail)
+}
 
 export default verticalMenuData

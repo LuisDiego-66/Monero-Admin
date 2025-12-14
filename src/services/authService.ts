@@ -8,6 +8,7 @@ export interface LoginCredentials {
 
 export interface LoginResponse {
   token: string
+  email?: string
 }
 
 class AuthService {
@@ -18,6 +19,11 @@ class AuthService {
       const response = await axios.post(`${this.baseURL}/api/auth/login`, credentials, {
         headers: { 'Content-Type': 'application/json' }
       })
+
+      // Guardar email si viene en la respuesta
+      if (response.data.email) {
+        this.setUserEmail(response.data.email)
+      }
 
       return response.data
     } catch (error: any) {
@@ -31,6 +37,7 @@ class AuthService {
 
   async logout(): Promise<void> {
     this.removeToken()
+    this.removeUserEmail()
   }
 
   setToken(token: string) {
@@ -47,6 +54,22 @@ class AuthService {
 
   removeToken() {
     Cookies.remove('auth-token')
+  }
+
+  setUserEmail(email: string) {
+    Cookies.set('user-email', email, {
+      expires: 7,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax'
+    })
+  }
+
+  getUserEmail(): string | null {
+    return Cookies.get('user-email') || null
+  }
+
+  removeUserEmail() {
+    Cookies.remove('user-email')
   }
 
   isAuthenticated(): boolean {

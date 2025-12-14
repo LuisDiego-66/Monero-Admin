@@ -104,10 +104,10 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
 
   const validateImageFile = useCallback(
     (file: File): boolean => {
-      const validTypes = ['image/jpeg', 'image/jpg', 'image/png']
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 
       if (!validTypes.includes(file.type.toLowerCase())) {
-        onError('Solo se permiten imágenes en formato JPG, JPEG o PNG')
+        onError('Solo se permiten imágenes en formato JPG, JPEG, PNG o WEBP')
 
         return false
       }
@@ -477,7 +477,7 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
                 <input
                   id='outfit-images-upload'
                   type='file'
-                  accept='image/jpeg,image/jpg,image/png'
+                  accept='image/jpeg,image/jpg,image/png,image/webp'
                   multiple
                   style={{ display: 'none' }}
                   onChange={handleImageChange}
@@ -488,7 +488,7 @@ const CreateEditOutfitModal = ({ open, onClose, outfit, onSuccess, onError }: Cr
                     Arrastra imágenes aquí o haz clic para seleccionar
                   </Typography>
                   <Typography variant='caption' color='text.secondary'>
-                    2MB cada una - JPG, JPEG, PNG
+                    2MB cada una - JPG, JPEG, PNG, WEBP
                   </Typography>
                 </Box>
               </label>

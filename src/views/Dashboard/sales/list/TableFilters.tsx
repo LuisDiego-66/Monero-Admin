@@ -1,6 +1,10 @@
+import { useEffect } from 'react'
+
 import { MenuItem } from '@mui/material'
 
 import CustomTextField from '@core/components/mui/TextField'
+import { authService } from '@/services/authService'
+import { getRoleFromEmail } from '@/utils/menuPermissions'
 
 interface TableFiltersProps {
   typeFilter: string
@@ -20,6 +24,15 @@ const TableFilters = ({
   setEndDate
 }: TableFiltersProps) => {
   const today = new Date().toISOString().split('T')[0]
+  const userEmail = authService.getUserEmail()
+  const userRole = getRoleFromEmail(userEmail)
+  const isCashier = userRole === 'CASHIER'
+
+  useEffect(() => {
+    if (isCashier && typeFilter === 'all') {
+      setTypeFilter('online')
+    }
+  }, [isCashier, typeFilter, setTypeFilter])
 
   const handleStartDateChange = (value: string) => {
     setStartDate(value)
@@ -40,8 +53,8 @@ const TableFilters = ({
         className='max-sm:is-full sm:is-[200px]'
         label='Tipo de Venta'
       >
-        <MenuItem value='all'>Todos</MenuItem>
-        <MenuItem value='in_store'>En Tienda</MenuItem>
+        {!isCashier && <MenuItem value='all'>Todos</MenuItem>}
+        {!isCashier && <MenuItem value='in_store'>En Tienda</MenuItem>}
         <MenuItem value='online'>En Línea</MenuItem>
       </CustomTextField>
 

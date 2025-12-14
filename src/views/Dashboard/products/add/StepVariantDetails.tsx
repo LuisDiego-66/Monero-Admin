@@ -97,7 +97,7 @@ const StepVariantDetails = ({ activeStep, handlePrev, steps, mode, productId, pr
   const detectFileType = (url: string): 'image' | 'video' | 'document' => {
     const ext = url.split('.').pop()?.toLowerCase() || ''
 
-    if (['jpg', 'jpeg', 'png'].includes(ext)) return 'image'
+    if (['jpg', 'jpeg', 'png', 'webp'].includes(ext)) return 'image'
     if (['mp4'].includes(ext)) return 'video'
     if (ext === 'pdf') return 'document'
 

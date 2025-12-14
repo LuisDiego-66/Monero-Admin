@@ -48,7 +48,7 @@ const VariantMediaUploader = ({ mediaFiles, onFilesChange, error, onErrorChange,
     })
 
     if (invalidFiles.length > 0) {
-      onErrorChange(`Formato no válido: ${invalidFiles.join(', ')}. Solo se permiten JPG, JPEG, PNG, MP4, PDF`)
+      onErrorChange(`Formato no válido: ${invalidFiles.join(', ')}. Solo se permiten JPG, JPEG, PNG, WEBP, MP4, PDF`)
       toast.error(`${invalidFiles.length} archivo(s) con formato no válido`)
     }
 
@@ -159,7 +159,7 @@ const VariantMediaUploader = ({ mediaFiles, onFilesChange, error, onErrorChange,
           {isDragging ? 'Suelta aquí los archivos' : 'Arrastra imágenes/videos o haz clic para seleccionar'}
         </Typography>
         <Typography variant='caption' color={error ? 'error' : 'text.secondary'}>
-          Formatos: JPG, JPEG, PNG, MP4, PDF
+          Formatos: JPG, JPEG, PNG, WEBP, MP4, PDF
         </Typography>
       </Box>
 

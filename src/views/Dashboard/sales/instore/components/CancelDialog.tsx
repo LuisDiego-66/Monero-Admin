@@ -24,9 +24,7 @@ const CancelDialog: React.FC<CancelDialogProps> = ({ open, orderData, isLoading,
   return (
     <Dialog open={open} onClose={onClose} maxWidth='xs' fullWidth>
       <DialogTitle>
-        <Typography variant='h6' fontWeight='bold'>
-          ¿Cancelar Orden?
-        </Typography>
+        <Typography fontWeight='bold'>¿Cancelar Orden?</Typography>
       </DialogTitle>
       <DialogContent>
         <Typography>

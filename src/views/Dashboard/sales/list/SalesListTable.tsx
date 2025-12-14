@@ -10,6 +10,8 @@ import TablePagination from '@mui/material/TablePagination'
 import CircularProgress from '@mui/material/CircularProgress'
 
 import { useOrders } from '@/hooks/useSales'
+import { authService } from '@/services/authService'
+import { getRoleFromEmail } from '@/utils/menuPermissions'
 import OrderDetailsModal from './SaleDetailsModal'
 import TableFilters from './TableFilters'
 import type { Order } from '@/types/api/sales'
@@ -75,11 +77,15 @@ const formatDate = (dateString: string): string => {
 }
 
 const OrdersListTable = () => {
+  const userEmail = authService.getUserEmail()
+  const userRole = getRoleFromEmail(userEmail)
+  const isCashier = userRole === 'CASHIER'
+
   const [page, setPage] = useState(0)
   const [limit, setLimit] = useState(10)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
-  const [typeFilter, setTypeFilter] = useState('all')
+  const [typeFilter, setTypeFilter] = useState(isCashier ? 'online' : 'all')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
 

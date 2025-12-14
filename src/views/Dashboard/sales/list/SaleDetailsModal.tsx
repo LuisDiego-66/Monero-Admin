@@ -107,6 +107,7 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
   const queryClient = useQueryClient()
   const [dhlCode, setDhlCode] = useState('')
   const [showDhlInput, setShowDhlInput] = useState(false)
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const [snackPack, setSnackPack] = useState<SnackbarMessage[]>([])
   const [messageInfo, setMessageInfo] = useState<SnackbarMessage | undefined>(undefined)
   const [snackbarOpen, setSnackbarOpen] = useState(false)
@@ -133,6 +134,8 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
   }
 
   const handleCancelar = async () => {
+    setShowCancelConfirm(false)
+
     try {
       await cancelOrderMutation.mutateAsync(order.id)
       showMessage('Orden cancelada exitosamente', 'success')
@@ -411,17 +414,11 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
             <Button
               variant='contained'
               color='error'
-              onClick={handleCancelar}
+              onClick={() => setShowCancelConfirm(true)}
               disabled={cancelOrderMutation.isPending}
-              startIcon={
-                cancelOrderMutation.isPending ? (
-                  <CircularProgress size={20} color='inherit' />
-                ) : (
-                  <i className='tabler-x' />
-                )
-              }
+              startIcon={<i className='tabler-x' />}
             >
-              {cancelOrderMutation.isPending ? 'Cancelando...' : 'Cancelar Orden'}
+              Cancelar Orden
             </Button>
           )}
 
@@ -431,17 +428,11 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
               <Button
                 variant='outlined'
                 color='error'
-                onClick={handleCancelar}
+                onClick={() => setShowCancelConfirm(true)}
                 disabled={cancelOrderMutation.isPending || sendOrderMutation.isPending}
-                startIcon={
-                  cancelOrderMutation.isPending ? (
-                    <CircularProgress size={20} color='inherit' />
-                  ) : (
-                    <i className='tabler-x' />
-                  )
-                }
+                startIcon={<i className='tabler-x' />}
               >
-                {cancelOrderMutation.isPending ? 'Cancelando...' : 'Cancelar Orden'}
+                Cancelar Orden
               </Button>
 
               {!showDhlInput && (
@@ -504,17 +495,11 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
             <Button
               variant='contained'
               color='error'
-              onClick={handleCancelar}
+              onClick={() => setShowCancelConfirm(true)}
               disabled={cancelOrderMutation.isPending}
-              startIcon={
-                cancelOrderMutation.isPending ? (
-                  <CircularProgress size={20} color='inherit' />
-                ) : (
-                  <i className='tabler-x' />
-                )
-              }
+              startIcon={<i className='tabler-x' />}
             >
-              {cancelOrderMutation.isPending ? 'Cancelando...' : 'Cancelar Orden'}
+              Cancelar Orden
             </Button>
           )}
 
@@ -526,6 +511,33 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
           )}
         </Box>
       </DialogActions>
+
+      {/* Modal de confirmación de cancelación */}
+      <Dialog open={showCancelConfirm} onClose={() => setShowCancelConfirm(false)} maxWidth='xs' fullWidth>
+        <DialogTitle>
+          <Typography fontWeight='bold'>¿Cancelar Orden?</Typography>
+        </DialogTitle>
+        <DialogContent>
+          <Typography>
+            ¿Estás seguro que deseas cancelar la orden #{order.id}? Esta acción no se puede deshacer.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
+          <Button onClick={() => setShowCancelConfirm(false)} disabled={cancelOrderMutation.isPending} variant='outlined' fullWidth>
+            No, Continuar
+          </Button>
+          <Button
+            onClick={handleCancelar}
+            color='error'
+            variant='contained'
+            disabled={cancelOrderMutation.isPending}
+            startIcon={cancelOrderMutation.isPending ? <CircularProgress size={20} color='inherit' /> : null}
+            fullWidth
+          >
+            {cancelOrderMutation.isPending ? 'Cancelando...' : 'Sí, Cancelar'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Snackbar
         open={snackbarOpen}

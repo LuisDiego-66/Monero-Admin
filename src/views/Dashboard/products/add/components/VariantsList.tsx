@@ -120,7 +120,7 @@ const VariantsList = ({ variants, isLoading, editingVariantId, onVariantClick }:
                                 .filter(url => {
                                   const ext = url.split('.').pop()?.toLowerCase() || ''
 
-                                  return ['jpg', 'jpeg', 'png'].includes(ext)
+                                  return ['jpg', 'jpeg', 'png', 'webp'].includes(ext)
                                 })
                                 .slice(0, 3)
                                 .map((url, idx) => (

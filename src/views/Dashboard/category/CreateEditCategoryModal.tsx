@@ -112,10 +112,10 @@ const CreateEditCategoryModal = ({
 
   const validateImageFile = useCallback(
     (file: File): boolean => {
-      const validTypes = ['image/jpeg', 'image/jpg', 'image/png']
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 
       if (!validTypes.includes(file.type.toLowerCase())) {
-        onError('Solo se permiten imágenes en formato JPG, JPEG o PNG')
+        onError('Solo se permiten imágenes en formato JPG, JPEG, PNG o WEBP')
 
         return false
       }
@@ -543,7 +543,7 @@ const CreateEditCategoryModal = ({
                     <input
                       id='category-image-upload'
                       type='file'
-                      accept='image/jpeg,image/jpg,image/png'
+                      accept='image/jpeg,image/jpg,image/png,image/webp'
                       style={{ display: 'none' }}
                       onChange={handleImageChange}
                     />
@@ -553,7 +553,7 @@ const CreateEditCategoryModal = ({
                         Arrastra una imagen aquí o haz clic para seleccionar
                       </Typography>
                       <Typography variant='caption' color='text.secondary'>
-                        Máximo 2MB - Formatos: JPG, JPEG, PNG
+                        Máximo 2MB - Formatos: JPG, JPEG, PNG, WEBP
                       </Typography>
                     </Box>
                   </label>

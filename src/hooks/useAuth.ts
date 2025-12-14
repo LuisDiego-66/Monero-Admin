@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { authService, type LoginCredentials } from '@/services/authService'
+import { getHomeRouteByRole } from '@/utils/menuPermissions'
 
 export const useAuth = () => {
   const router = useRouter()
@@ -15,7 +16,10 @@ export const useAuth = () => {
     mutationFn: (credentials: LoginCredentials) => authService.login(credentials),
     onSuccess: data => {
       authService.setToken(data.token)
-      const redirectTo = searchParams?.get('redirect') || '/home'
+
+      const userEmail = data.email || authService.getUserEmail()
+      const defaultRoute = getHomeRouteByRole(userEmail)
+      const redirectTo = searchParams?.get('redirect') || defaultRoute
 
       router.push(redirectTo)
     }

@@ -21,6 +21,7 @@ import CircularProgress from '@mui/material/CircularProgress'
 
 import { useSettings } from '@core/hooks/useSettings'
 import { useAuth } from '@/hooks/useAuth'
+import { authService } from '@/services/authService'
 
 const BadgeContentSpan = styled('span')({
   width: 8,
@@ -37,6 +38,7 @@ const UserDropdown = () => {
   const router = useRouter()
   const { settings } = useSettings()
   const { logout, isLoggingOut } = useAuth()
+  const userEmail = authService.getUserEmail()
 
   const handleDropdownOpen = () => {
     setOpen(!open)
@@ -100,7 +102,7 @@ const UserDropdown = () => {
                       <Typography className='font-medium' color='text.primary'>
                         Administrador
                       </Typography>
-                      <Typography variant='caption'>Monero Administrador</Typography>
+                      <Typography variant='caption'>{userEmail || 'Monero Administrador'}</Typography>
                     </div>
                   </div>
                   <Divider className='mlb-1' />
