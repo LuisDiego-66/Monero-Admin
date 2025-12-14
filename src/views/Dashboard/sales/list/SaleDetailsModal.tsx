@@ -13,7 +13,7 @@ import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
 import Box from '@mui/material/Box'
 import Chip from '@mui/material/Chip'
-import Grid from '@mui/material/Grid'
+import Grid from '@mui/material/Grid2'
 import Table from '@mui/material/Table'
 import TableBody from '@mui/material/TableBody'
 import TableCell from '@mui/material/TableCell'
@@ -201,7 +201,7 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
               </Typography>
 
               <Grid container spacing={3}>
-                <Grid item xs={12} sm={6}>
+                <Grid size={{ xs: 12, sm: 6 }}>
                   <Box className='space-y-3'>
                     <Box>
                       <Typography variant='caption' className='text-textSecondary'>
@@ -237,7 +237,7 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
                   </Box>
                 </Grid>
 
-                <Grid item xs={12} sm={6}>
+                <Grid size={{ xs: 12, sm: 6 }}>
                   <Box className='space-y-3'>
                     <Box>
                       <Typography variant='caption' className='text-textSecondary'>
@@ -280,9 +280,42 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
                 <Typography variant='h6' className='mb-4 text-textPrimary'>
                   Información del Cliente
                 </Typography>
-                <Typography variant='body2' color='text.secondary'>
-                  Cliente: {JSON.stringify(order.customer)}
-                </Typography>
+                <Grid container spacing={2}>
+                  {order.customer.name && (
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <Typography variant='caption' className='text-textSecondary'>
+                        Nombre
+                      </Typography>
+                      <Typography variant='body2'>{order.customer.name}</Typography>
+                    </Grid>
+                  )}
+                  {order.customer.email && (
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <Typography variant='caption' className='text-textSecondary'>
+                        Email
+                      </Typography>
+                      <Typography variant='body2'>{order.customer.email}</Typography>
+                    </Grid>
+                  )}
+                  {order.customer.phone && (
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <Typography variant='caption' className='text-textSecondary'>
+                        Teléfono
+                      </Typography>
+                      <Typography variant='body2'>{order.customer.phone}</Typography>
+                    </Grid>
+                  )}
+                  {order.customer.type && (
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <Typography variant='caption' className='text-textSecondary'>
+                        Tipo
+                      </Typography>
+                      <Typography variant='body2'>
+                        {order.customer.type === 'registered' ? 'Registrado' : 'Suscriptor'}
+                      </Typography>
+                    </Grid>
+                  )}
+                </Grid>
               </CardContent>
             </Card>
           )}
@@ -293,9 +326,56 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
                 <Typography variant='h6' className='mb-4 text-textPrimary'>
                   Dirección de Envío
                 </Typography>
-                <Typography variant='body2' color='text.secondary'>
-                  {JSON.stringify(order.address)}
-                </Typography>
+                <Grid container spacing={2}>
+                  {order.address.street && (
+                    <Grid size={{ xs: 12 }}>
+                      <Typography variant='caption' className='text-textSecondary'>
+                        Calle
+                      </Typography>
+                      <Typography variant='body2'>{order.address.street}</Typography>
+                    </Grid>
+                  )}
+                  {order.address.city && (
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <Typography variant='caption' className='text-textSecondary'>
+                        Ciudad
+                      </Typography>
+                      <Typography variant='body2'>{order.address.city}</Typography>
+                    </Grid>
+                  )}
+                  {order.address.state && (
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <Typography variant='caption' className='text-textSecondary'>
+                        Departamento/Estado
+                      </Typography>
+                      <Typography variant='body2'>{order.address.state}</Typography>
+                    </Grid>
+                  )}
+                  {order.address.country && (
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <Typography variant='caption' className='text-textSecondary'>
+                        País
+                      </Typography>
+                      <Typography variant='body2'>{order.address.country}</Typography>
+                    </Grid>
+                  )}
+                  {order.address.zipCode && (
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <Typography variant='caption' className='text-textSecondary'>
+                        Código Postal
+                      </Typography>
+                      <Typography variant='body2'>{order.address.zipCode}</Typography>
+                    </Grid>
+                  )}
+                  {order.address.reference && (
+                    <Grid size={{ xs: 12 }}>
+                      <Typography variant='caption' className='text-textSecondary'>
+                        Referencia
+                      </Typography>
+                      <Typography variant='body2'>{order.address.reference}</Typography>
+                    </Grid>
+                  )}
+                </Grid>
               </CardContent>
             </Card>
           )}
@@ -306,9 +386,67 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
                 <Typography variant='h6' className='mb-4 text-textPrimary'>
                   Información de Envío
                 </Typography>
-                <Typography variant='body2' color='text.secondary'>
-                  {JSON.stringify(order.shipment)}
-                </Typography>
+                <Grid container spacing={2}>
+                  {order.shipment.dhlCode && (
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <Typography variant='caption' className='text-textSecondary'>
+                        Código DHL
+                      </Typography>
+                      <Typography variant='body2' className='font-medium'>
+                        {order.shipment.dhlCode}
+                      </Typography>
+                    </Grid>
+                  )}
+                  {order.shipment.trackingUrl && (
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <Typography variant='caption' className='text-textSecondary'>
+                        URL de Rastreo
+                      </Typography>
+                      <Typography variant='body2'>
+                        <a
+                          href={order.shipment.trackingUrl}
+                          target='_blank'
+                          rel='noopener noreferrer'
+                          className='text-primary hover:underline'
+                        >
+                          Ver rastreo
+                        </a>
+                      </Typography>
+                    </Grid>
+                  )}
+                  {order.shipment.status && (
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <Typography variant='caption' className='text-textSecondary'>
+                        Estado de Envío
+                      </Typography>
+                      <Typography variant='body2'>{order.shipment.status}</Typography>
+                    </Grid>
+                  )}
+                  {order.shipment.estimatedDelivery && (
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <Typography variant='caption' className='text-textSecondary'>
+                        Entrega Estimada
+                      </Typography>
+                      <Typography variant='body2'>{formatDate(order.shipment.estimatedDelivery)}</Typography>
+                    </Grid>
+                  )}
+                  {order.shipment.carrier && (
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <Typography variant='caption' className='text-textSecondary'>
+                        Transportista
+                      </Typography>
+                      <Typography variant='body2'>{order.shipment.carrier}</Typography>
+                    </Grid>
+                  )}
+                  {order.shipment.notes && (
+                    <Grid size={{ xs: 12 }}>
+                      <Typography variant='caption' className='text-textSecondary'>
+                        Notas
+                      </Typography>
+                      <Typography variant='body2'>{order.shipment.notes}</Typography>
+                    </Grid>
+                  )}
+                </Grid>
               </CardContent>
             </Card>
           )}
@@ -409,7 +547,6 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
 
       <DialogActions className='p-6 pt-0'>
         <Box className='flex gap-3 w-full justify-end flex-wrap'>
-          {/* Estado: pending - Solo cancelar */}
           {order.status === 'pending' && (
             <Button
               variant='contained'
@@ -422,7 +559,6 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
             </Button>
           )}
 
-          {/* Estado: paid - Cancelar y Enviar */}
           {order.status === 'paid' && (
             <>
               <Button
@@ -490,7 +626,6 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
             </>
           )}
 
-          {/* Estado: sent - Solo cancelar */}
           {order.status === 'sent' && (
             <Button
               variant='contained'
@@ -503,7 +638,6 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
             </Button>
           )}
 
-          {/* Otros estados - Solo cerrar */}
           {!['pending', 'paid', 'sent'].includes(order.status) && (
             <Button variant='outlined' onClick={onClose}>
               Cerrar
@@ -523,7 +657,12 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
           </Typography>
         </DialogContent>
         <DialogActions sx={{ p: 2, gap: 1 }}>
-          <Button onClick={() => setShowCancelConfirm(false)} disabled={cancelOrderMutation.isPending} variant='outlined' fullWidth>
+          <Button
+            onClick={() => setShowCancelConfirm(false)}
+            disabled={cancelOrderMutation.isPending}
+            variant='outlined'
+            fullWidth
+          >
             No, Continuar
           </Button>
           <Button
