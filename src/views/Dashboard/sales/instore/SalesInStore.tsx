@@ -576,7 +576,7 @@ const PointOfSale: React.FC = () => {
         </Grid>
       </Box>
 
-      {/* Diálogo de pago - Incluye soporte para QR dinámico */}
+      {/* Diálogo de pago  */}
       <PaymentDialog
         open={showPaymentDialog}
         orderData={orderData}

@@ -9,12 +9,12 @@ import {
   Button,
   Box,
   Paper,
-  Grid,
   Card,
   CardContent,
   CircularProgress,
   LinearProgress
 } from '@mui/material'
+import Grid from '@mui/material/Grid2'
 
 import type { Order, RepriceResponse, GenerateQRResponse } from '@/types/api/sales'
 
@@ -123,33 +123,50 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
           </Typography>
         </Paper>
 
-        <Grid container spacing={2}>
-          {paymentMethods.map(method => (
-            <Grid item xs={6} key={method.id}>
-              <Card
-                sx={{
-                  cursor: 'pointer',
-                  border: 2,
-                  borderColor: selectedPayment === method.id ? method.color : 'divider',
-                  textAlign: 'center',
-                  transition: 'all 0.2s',
-                  '&:hover': {
-                    borderColor: method.color,
-                    boxShadow: 2
-                  }
-                }}
-                onClick={() => !isLoading && onPaymentSelect(method.id as 'cash' | 'card' | 'qr')}
-              >
-                <CardContent>
-                  <Box sx={{ fontSize: '3rem', mb: 1 }}>{method.icon}</Box>
-                  <Typography variant='h6' fontWeight='medium'>
-                    {method.name}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
+        {/* Mostrar métodos de pago solo si NO se ha creado la orden todavía */}
+        {!orderData && (
+          <Grid container spacing={2}>
+            {paymentMethods.map(method => (
+              <Grid size={{ xs: 6 }} key={method.id}>
+                <Card
+                  sx={{
+                    cursor: 'pointer',
+                    border: 2,
+                    borderColor: selectedPayment === method.id ? method.color : 'divider',
+                    textAlign: 'center',
+                    transition: 'all 0.2s',
+                    '&:hover': {
+                      borderColor: method.color,
+                      boxShadow: 2
+                    }
+                  }}
+                  onClick={() => !isLoading && onPaymentSelect(method.id as 'cash' | 'card' | 'qr')}
+                >
+                  <CardContent>
+                    <Box sx={{ fontSize: '3rem', mb: 1 }}>{method.icon}</Box>
+                    <Typography variant='h6' fontWeight='medium'>
+                      {method.name}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        )}
+
+        {orderData && selectedPayment && (
+          <Paper sx={{ p: 3, mb: 2, bgcolor: 'action.hover' }}>
+            <Typography variant='caption' color='text.secondary' display='block' gutterBottom>
+              Método de pago seleccionado:
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Box sx={{ fontSize: '2rem' }}>{paymentMethods.find(m => m.id === selectedPayment)?.icon}</Box>
+              <Typography variant='h6' fontWeight='bold'>
+                {paymentMethods.find(m => m.id === selectedPayment)?.name}
+              </Typography>
+            </Box>
+          </Paper>
+        )}
 
         {/* Sección de pago con QR */}
         {selectedPayment === 'qr' && (
