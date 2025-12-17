@@ -13,6 +13,8 @@ interface TableFiltersProps {
   setStartDate: (value: string) => void
   endDate: string
   setEndDate: (value: string) => void
+  paymentTypeFilter: string
+  setPaymentTypeFilter: (value: string) => void
 }
 
 const TableFilters = ({
@@ -21,7 +23,9 @@ const TableFilters = ({
   startDate,
   setStartDate,
   endDate,
-  setEndDate
+  setEndDate,
+  paymentTypeFilter,
+  setPaymentTypeFilter
 }: TableFiltersProps) => {
   const today = new Date().toISOString().split('T')[0]
   const userEmail = authService.getUserEmail()
@@ -56,6 +60,21 @@ const TableFilters = ({
         {!isCashier && <MenuItem value='all'>Todos</MenuItem>}
         {!isCashier && <MenuItem value='in_store'>En Tienda</MenuItem>}
         <MenuItem value='online'>En Línea</MenuItem>
+      </CustomTextField>
+
+      <CustomTextField
+        select
+        fullWidth
+        id='payment-type-filter'
+        value={paymentTypeFilter}
+        onChange={e => setPaymentTypeFilter(e.target.value)}
+        className='max-sm:is-full sm:is-[200px]'
+        label='Método de Pago'
+      >
+        <MenuItem value='all'>Todos</MenuItem>
+        <MenuItem value='cash'>Efectivo</MenuItem>
+        <MenuItem value='card'>Tarjeta</MenuItem>
+        <MenuItem value='qr'>QR</MenuItem>
       </CustomTextField>
 
       <CustomTextField

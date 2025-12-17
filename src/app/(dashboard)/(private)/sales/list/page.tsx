@@ -34,6 +34,9 @@ const SalesList = async () => {
       <Grid size={{ xs: 12 }}>
         <Typography variant='h4' sx={{ paddingLeft: '20px' }}>
           Lista de Ventas
+          <Typography sx={{ mt: 1 }}>
+            Aquí puedes gestionar las <code>ventas en tienda</code> realizar reportes.
+          </Typography>
         </Typography>
       </Grid>
       <Grid size={{ xs: 12 }}>

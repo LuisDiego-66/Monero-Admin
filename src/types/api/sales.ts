@@ -38,9 +38,12 @@ export interface OrderItem {
   unit_price: string
   discountValue: number
   totalPrice: string
+  createdAt?: string
   variant: {
     productColor: any
     id: number
+    size?: any
+    createdAt?: string
   }
 }
 
@@ -57,6 +60,10 @@ export interface Order {
   customer: any | null
   shipment: any | null
   address: any | null
+  dhl_code?: string | null
+  shipment_price?: number
+  address_data?: any | null
+  edited?: boolean
 }
 
 export interface CreateOrderRequest {
@@ -106,6 +113,7 @@ export interface OrdersListParams {
   type?: 'in_store' | 'online' | 'all'
   startDate?: string
   endDate?: string
+  paymentType?: 'cash' | 'card' | 'qr'
 }
 
 export interface OrdersListMeta {

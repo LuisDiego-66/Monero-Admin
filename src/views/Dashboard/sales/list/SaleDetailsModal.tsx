@@ -149,16 +149,10 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
   }
 
   const handleSendOrder = async () => {
-    if (order.shipment && !dhlCode.trim()) {
-      showMessage('Por favor ingrese el código DHL', 'warning')
-
-      return
-    }
-
     try {
       await sendOrderMutation.mutateAsync({
         orderId: order.id,
-        dhlCode: order.shipment ? dhlCode.trim() : undefined
+        dhlCode: dhlCode.trim() || undefined
       })
       showMessage('Orden enviada exitosamente', 'success')
       queryClient.invalidateQueries({ queryKey: ['orders'] })
@@ -202,54 +196,80 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
 
               <Grid container spacing={3}>
                 <Grid size={{ xs: 12, sm: 6 }}>
-                  <Box className='space-y-3'>
+                  <Box className='space-y-4'>
                     <Box>
-                      <Typography variant='caption' className='text-textSecondary'>
+                      <Typography variant='overline' className='text-textSecondary text-xs font-medium'>
                         ID de Orden
                       </Typography>
-                      <Typography variant='body1' className='font-medium'>
+                      <Typography variant='h6' className='font-bold mt-1'>
                         #{order.id}
                       </Typography>
                     </Box>
 
                     <Box>
-                      <Typography variant='caption' className='text-textSecondary'>
+                      <Typography variant='overline' className='text-textSecondary text-xs font-medium'>
                         Tipo de Venta
                       </Typography>
-                      <Typography variant='body1'>{getTipoLabel(order.type)}</Typography>
+                      <Typography variant='body1' className='font-semibold mt-1'>
+                        {getTipoLabel(order.type)}
+                      </Typography>
                     </Box>
 
                     <Box>
-                      <Typography variant='caption' className='text-textSecondary'>
+                      <Typography variant='overline' className='text-textSecondary text-xs font-medium'>
                         Método de Pago
                       </Typography>
-                      <Typography variant='body1'>
+                      <Typography variant='body1' className='font-semibold mt-1'>
                         {order.payment_type ? getPaymentLabel(order.payment_type) : 'N/A'}
                       </Typography>
                     </Box>
 
                     <Box>
-                      <Typography variant='caption' className='text-textSecondary'>
+                      <Typography variant='overline' className='text-textSecondary text-xs font-medium'>
                         Fecha de Creación
                       </Typography>
-                      <Typography variant='body2'>{order.createdAt ? formatDate(order.createdAt) : 'N/A'}</Typography>
+                      <Typography variant='body1' className='font-medium mt-1'>
+                        {order.createdAt ? formatDate(order.createdAt) : 'N/A'}
+                      </Typography>
                     </Box>
+
+                    {order.expiresAt && (
+                      <Box>
+                        <Typography variant='overline' className='text-textSecondary text-xs font-medium'>
+                          Expira en
+                        </Typography>
+                        <Typography variant='body1' className='font-medium mt-1 text-error'>
+                          {formatDate(order.expiresAt)}
+                        </Typography>
+                      </Box>
+                    )}
                   </Box>
                 </Grid>
 
                 <Grid size={{ xs: 12, sm: 6 }}>
-                  <Box className='space-y-3'>
+                  <Box className='space-y-4'>
                     <Box>
-                      <Typography variant='caption' className='text-textSecondary'>
+                      <Typography variant='overline' className='text-textSecondary text-xs font-medium'>
                         Total
                       </Typography>
-                      <Typography variant='h6' className='font-semibold text-primary'>
+                      <Typography variant='h5' className='font-bold text-primary mt-1'>
                         Bs. {parseFloat(order.totalPrice).toFixed(2)}
                       </Typography>
                     </Box>
 
+                    {order.shipment_price !== undefined && order.shipment_price > 0 && (
+                      <Box>
+                        <Typography variant='overline' className='text-textSecondary text-xs font-medium'>
+                          Costo de Envío
+                        </Typography>
+                        <Typography variant='body1' className='font-semibold text-warning mt-1'>
+                          Bs. {parseFloat(String(order.shipment_price)).toFixed(2)}
+                        </Typography>
+                      </Box>
+                    )}
+
                     <Box>
-                      <Typography variant='caption' className='text-textSecondary'>
+                      <Typography variant='overline' className='text-textSecondary text-xs font-medium'>
                         Estado
                       </Typography>
                       <Box className='mt-1'>
@@ -257,16 +277,24 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
                           label={getEstadoLabel(order.status)}
                           variant='tonal'
                           color={getEstadoColor(order.status)}
-                          size='small'
+                          size='medium'
                         />
                       </Box>
                     </Box>
 
                     <Box>
-                      <Typography variant='caption' className='text-textSecondary'>
-                        Habilitado
+                      <Typography variant='overline' className='text-textSecondary text-xs font-medium'>
+                        Orden Editada
                       </Typography>
-                      <Typography variant='body1'>{order.enabled ? 'Sí' : 'No'}</Typography>
+                      <Box className='mt-1'>
+                        {order.edited ? (
+                          <Chip label='Sí' color='warning' variant='tonal' size='small' />
+                        ) : (
+                          <Typography variant='body1' className='font-medium'>
+                            No
+                          </Typography>
+                        )}
+                      </Box>
                     </Box>
                   </Box>
                 </Grid>
@@ -280,37 +308,63 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
                 <Typography variant='h6' className='mb-4 text-textPrimary'>
                   Información del Cliente
                 </Typography>
-                <Grid container spacing={2}>
+                <Grid container spacing={3}>
                   {order.customer.name && (
                     <Grid size={{ xs: 12, sm: 6 }}>
-                      <Typography variant='caption' className='text-textSecondary'>
+                      <Typography variant='overline' className='text-textSecondary text-xs font-medium block'>
                         Nombre
                       </Typography>
-                      <Typography variant='body2'>{order.customer.name}</Typography>
+                      <Typography variant='body1' className='font-semibold mt-1'>
+                        {order.customer.name}
+                      </Typography>
                     </Grid>
                   )}
                   {order.customer.email && (
                     <Grid size={{ xs: 12, sm: 6 }}>
-                      <Typography variant='caption' className='text-textSecondary'>
+                      <Typography variant='overline' className='text-textSecondary text-xs font-medium block'>
                         Email
                       </Typography>
-                      <Typography variant='body2'>{order.customer.email}</Typography>
+                      <Typography variant='body1' className='font-medium mt-1'>
+                        {order.customer.email}
+                      </Typography>
                     </Grid>
                   )}
                   {order.customer.phone && (
                     <Grid size={{ xs: 12, sm: 6 }}>
-                      <Typography variant='caption' className='text-textSecondary'>
+                      <Typography variant='overline' className='text-textSecondary text-xs font-medium block'>
                         Teléfono
                       </Typography>
-                      <Typography variant='body2'>{order.customer.phone}</Typography>
+                      <Box className='flex items-center gap-2 mt-1'>
+                        <Typography variant='body1' className='font-medium'>
+                          {order.customer.phone}
+                        </Typography>
+                        <IconButton
+                          size='small'
+                          color='success'
+                          href={`https://wa.me/${order.customer.phone.replace(/[^0-9]/g, '')}`}
+                          target='_blank'
+                          rel='noopener noreferrer'
+                          sx={{
+                            bgcolor: '#25D366',
+                            color: 'white',
+                            width: 32,
+                            height: 32,
+                            '&:hover': {
+                              bgcolor: '#128C7E'
+                            }
+                          }}
+                        >
+                          <i className='tabler-brand-whatsapp' style={{ fontSize: '1.25rem' }} />
+                        </IconButton>
+                      </Box>
                     </Grid>
                   )}
                   {order.customer.type && (
                     <Grid size={{ xs: 12, sm: 6 }}>
-                      <Typography variant='caption' className='text-textSecondary'>
-                        Tipo
+                      <Typography variant='overline' className='text-textSecondary text-xs font-medium block'>
+                        Tipo de Cliente
                       </Typography>
-                      <Typography variant='body2'>
+                      <Typography variant='body1' className='font-medium mt-1'>
                         {order.customer.type === 'registered' ? 'Registrado' : 'Suscriptor'}
                       </Typography>
                     </Grid>
@@ -326,53 +380,55 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
                 <Typography variant='h6' className='mb-4 text-textPrimary'>
                   Dirección de Envío
                 </Typography>
-                <Grid container spacing={2}>
-                  {order.address.street && (
+                <Grid container spacing={3}>
+                  {order.address.address && (
                     <Grid size={{ xs: 12 }}>
-                      <Typography variant='caption' className='text-textSecondary'>
-                        Calle
+                      <Typography variant='overline' className='text-textSecondary text-xs font-medium block'>
+                        Dirección
                       </Typography>
-                      <Typography variant='body2'>{order.address.street}</Typography>
+                      <Typography variant='body1' className='font-medium mt-1' style={{ whiteSpace: 'pre-line' }}>
+                        {order.address.address}
+                      </Typography>
                     </Grid>
                   )}
                   {order.address.city && (
                     <Grid size={{ xs: 12, sm: 6 }}>
-                      <Typography variant='caption' className='text-textSecondary'>
+                      <Typography variant='overline' className='text-textSecondary text-xs font-medium block'>
                         Ciudad
                       </Typography>
-                      <Typography variant='body2'>{order.address.city}</Typography>
-                    </Grid>
-                  )}
-                  {order.address.state && (
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                      <Typography variant='caption' className='text-textSecondary'>
-                        Departamento/Estado
+                      <Typography variant='body1' className='font-semibold mt-1'>
+                        {order.address.city}
                       </Typography>
-                      <Typography variant='body2'>{order.address.state}</Typography>
                     </Grid>
                   )}
                   {order.address.country && (
                     <Grid size={{ xs: 12, sm: 6 }}>
-                      <Typography variant='caption' className='text-textSecondary'>
+                      <Typography variant='overline' className='text-textSecondary text-xs font-medium block'>
                         País
                       </Typography>
-                      <Typography variant='body2'>{order.address.country}</Typography>
+                      <Typography variant='body1' className='font-semibold mt-1'>
+                        {order.address.country}
+                      </Typography>
                     </Grid>
                   )}
-                  {order.address.zipCode && (
+                  {order.address.postal_code && (
                     <Grid size={{ xs: 12, sm: 6 }}>
-                      <Typography variant='caption' className='text-textSecondary'>
+                      <Typography variant='overline' className='text-textSecondary text-xs font-medium block'>
                         Código Postal
                       </Typography>
-                      <Typography variant='body2'>{order.address.zipCode}</Typography>
+                      <Typography variant='body1' className='font-medium mt-1'>
+                        {order.address.postal_code}
+                      </Typography>
                     </Grid>
                   )}
-                  {order.address.reference && (
-                    <Grid size={{ xs: 12 }}>
-                      <Typography variant='caption' className='text-textSecondary'>
-                        Referencia
+                  {order.address.type && (
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <Typography variant='overline' className='text-textSecondary text-xs font-medium block'>
+                        Tipo de Envío
                       </Typography>
-                      <Typography variant='body2'>{order.address.reference}</Typography>
+                      <Typography variant='body1' className='font-medium mt-1'>
+                        {order.address.type === 'national' ? 'Nacional' : 'Internacional'}
+                      </Typography>
                     </Grid>
                   )}
                 </Grid>
@@ -386,64 +442,35 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
                 <Typography variant='h6' className='mb-4 text-textPrimary'>
                   Información de Envío
                 </Typography>
-                <Grid container spacing={2}>
-                  {order.shipment.dhlCode && (
+                <Grid container spacing={3}>
+                  {order.shipment.name && (
                     <Grid size={{ xs: 12, sm: 6 }}>
-                      <Typography variant='caption' className='text-textSecondary'>
+                      <Typography variant='overline' className='text-textSecondary text-xs font-medium block'>
+                        Tipo de Envío
+                      </Typography>
+                      <Typography variant='body1' className='font-semibold mt-1'>
+                        {order.shipment.name}
+                      </Typography>
+                    </Grid>
+                  )}
+                  {order.shipment.price && (
+                    <Grid size={{ xs: 12, sm: 6 }}>
+                      <Typography variant='overline' className='text-textSecondary text-xs font-medium block'>
+                        Costo de Envío
+                      </Typography>
+                      <Typography variant='h6' className='font-bold text-primary mt-1'>
+                        Bs. {parseFloat(order.shipment.price).toFixed(2)}
+                      </Typography>
+                    </Grid>
+                  )}
+                  {order.dhl_code && (
+                    <Grid size={{ xs: 12 }}>
+                      <Typography variant='overline' className='text-textSecondary text-xs font-medium block'>
                         Código DHL
                       </Typography>
-                      <Typography variant='body2' className='font-medium'>
-                        {order.shipment.dhlCode}
+                      <Typography variant='h6' className='font-bold mt-1'>
+                        {order.dhl_code}
                       </Typography>
-                    </Grid>
-                  )}
-                  {order.shipment.trackingUrl && (
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                      <Typography variant='caption' className='text-textSecondary'>
-                        URL de Rastreo
-                      </Typography>
-                      <Typography variant='body2'>
-                        <a
-                          href={order.shipment.trackingUrl}
-                          target='_blank'
-                          rel='noopener noreferrer'
-                          className='text-primary hover:underline'
-                        >
-                          Ver rastreo
-                        </a>
-                      </Typography>
-                    </Grid>
-                  )}
-                  {order.shipment.status && (
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                      <Typography variant='caption' className='text-textSecondary'>
-                        Estado de Envío
-                      </Typography>
-                      <Typography variant='body2'>{order.shipment.status}</Typography>
-                    </Grid>
-                  )}
-                  {order.shipment.estimatedDelivery && (
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                      <Typography variant='caption' className='text-textSecondary'>
-                        Entrega Estimada
-                      </Typography>
-                      <Typography variant='body2'>{formatDate(order.shipment.estimatedDelivery)}</Typography>
-                    </Grid>
-                  )}
-                  {order.shipment.carrier && (
-                    <Grid size={{ xs: 12, sm: 6 }}>
-                      <Typography variant='caption' className='text-textSecondary'>
-                        Transportista
-                      </Typography>
-                      <Typography variant='body2'>{order.shipment.carrier}</Typography>
-                    </Grid>
-                  )}
-                  {order.shipment.notes && (
-                    <Grid size={{ xs: 12 }}>
-                      <Typography variant='caption' className='text-textSecondary'>
-                        Notas
-                      </Typography>
-                      <Typography variant='body2'>{order.shipment.notes}</Typography>
                     </Grid>
                   )}
                 </Grid>
@@ -461,7 +488,7 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
                 <Table>
                   <TableHead>
                     <TableRow>
-                      <TableCell width='80px'>Imagen</TableCell>
+                      <TableCell width='220px'>Imagen</TableCell>
                       <TableCell>Producto</TableCell>
                       <TableCell align='center'>Cantidad</TableCell>
                       <TableCell align='right'>Precio Unit.</TableCell>
@@ -473,7 +500,7 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
                     {order.items.map(item => (
                       <TableRow key={item.id} hover>
                         <TableCell>
-                          <Box className='w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden border'>
+                          <Box className='w-48 h-48 bg-gray-100 rounded-xl flex items-center justify-center overflow-hidden border-2 border-gray-300 shadow-lg'>
                             {item.variant?.productColor?.multimedia?.[0] ? (
                               <img
                                 src={item.variant.productColor.multimedia[0]}
@@ -482,7 +509,7 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
                               />
                             ) : (
                               <Box className='w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center'>
-                                <Typography variant='h6' className='text-gray-400'>
+                                <Typography variant='h2' className='text-gray-400'>
                                   📦
                                 </Typography>
                               </Box>
@@ -491,48 +518,102 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
                         </TableCell>
 
                         <TableCell>
-                          <Typography variant='body2' className='font-medium'>
+                          <Typography variant='body1' className='font-bold text-textPrimary'>
                             {item.variant?.productColor?.product?.name || 'Producto sin nombre'}
                           </Typography>
                           {item.variant?.productColor?.product?.description && (
-                            <Typography variant='caption' color='text.secondary' className='block mt-1'>
+                            <Typography variant='body2' color='text.secondary' className='block mt-1'>
                               {item.variant.productColor.product.description}
+                            </Typography>
+                          )}
+                          <Box className='flex gap-3 mt-2'>
+                            {item.variant?.productColor?.color && (
+                              <Box className='flex items-center gap-1'>
+                                <Typography variant='caption' className='text-textSecondary font-medium'>
+                                  Color:
+                                </Typography>
+                                <Chip
+                                  label={item.variant.productColor.color.name}
+                                  size='small'
+                                  variant='tonal'
+                                  sx={{
+                                    height: 20,
+                                    fontSize: '0.75rem',
+                                    fontWeight: 600
+                                  }}
+                                />
+                              </Box>
+                            )}
+                            {item.variant?.size && (
+                              <Box className='flex items-center gap-1'>
+                                <Typography variant='caption' className='text-textSecondary font-medium'>
+                                  Talla:
+                                </Typography>
+                                <Chip
+                                  label={item.variant.size.name}
+                                  size='small'
+                                  variant='tonal'
+                                  sx={{
+                                    height: 20,
+                                    fontSize: '0.75rem',
+                                    fontWeight: 600
+                                  }}
+                                />
+                              </Box>
+                            )}
+                          </Box>
+                        </TableCell>
+
+                        <TableCell align='center'>
+                          <Chip
+                            label={`x${item.quantity}`}
+                            color='primary'
+                            variant='tonal'
+                            sx={{
+                              fontWeight: 700,
+                              fontSize: '0.875rem'
+                            }}
+                          />
+                        </TableCell>
+
+                        <TableCell align='right'>
+                          <Typography variant='body1' className='font-semibold'>
+                            Bs. {parseFloat(item.unit_price).toFixed(2)}
+                          </Typography>
+                        </TableCell>
+
+                        <TableCell align='right'>
+                          {item.discountValue > 0 ? (
+                            <Chip
+                              label={`-${item.discountValue}%`}
+                              color='error'
+                              variant='tonal'
+                              size='small'
+                              sx={{ fontWeight: 600 }}
+                            />
+                          ) : (
+                            <Typography variant='body2' color='text.secondary'>
+                              —
                             </Typography>
                           )}
                         </TableCell>
 
-                        <TableCell align='center'>
-                          <Typography variant='body2' className='font-medium'>
-                            {item.quantity}
-                          </Typography>
-                        </TableCell>
-
                         <TableCell align='right'>
-                          <Typography variant='body2'>Bs. {parseFloat(item.unit_price).toFixed(2)}</Typography>
-                        </TableCell>
-
-                        <TableCell align='right'>
-                          <Typography variant='body2' color={item.discountValue > 0 ? 'error' : 'text.secondary'}>
-                            {item.discountValue > 0 ? `-${item.discountValue}%` : '0%'}
-                          </Typography>
-                        </TableCell>
-
-                        <TableCell align='right'>
-                          <Typography variant='body2' className='font-semibold'>
+                          <Typography variant='h6' className='font-bold text-primary'>
                             Bs. {parseFloat(item.totalPrice).toFixed(2)}
                           </Typography>
                         </TableCell>
                       </TableRow>
                     ))}
 
-                    <TableRow>
-                      <TableCell colSpan={5} align='right'>
-                        <Typography variant='h6' className='font-bold'>
+                    <TableRow sx={{ bgcolor: 'action.hover' }}>
+                      <TableCell colSpan={5} align='right' sx={{ borderBottom: 'none', py: 3 }}>
+                        <Typography variant='h6' className='font-bold text-textPrimary'>
                           Total de la Orden:
                         </Typography>
                       </TableCell>
-                      <TableCell align='right'>
-                        <Typography variant='h6' className='font-bold text-primary'>
+                      <TableCell align='right' sx={{ borderBottom: 'none', py: 3 }}>
+                        <Typography variant='h5' className='font-bold text-primary'>
                           Bs. {parseFloat(order.totalPrice).toFixed(2)}
                         </Typography>
                       </TableCell>

@@ -86,6 +86,16 @@ class CartServiceClass {
 
     return response.data
   }
+
+  // Exportar órdenes a Excel
+  async exportToExcel(params: OrdersListParams): Promise<Blob> {
+    const response = await apiClient.get('/api/orders/export/exel', {
+      params,
+      responseType: 'blob'
+    })
+
+    return response.data
+  }
 }
 
 export const cartService = new CartServiceClass()

@@ -8,10 +8,12 @@ import Chip from '@mui/material/Chip'
 import Typography from '@mui/material/Typography'
 import TablePagination from '@mui/material/TablePagination'
 import CircularProgress from '@mui/material/CircularProgress'
+import Button from '@mui/material/Button'
 
 import { useOrders } from '@/hooks/useSales'
 import { authService } from '@/services/authService'
 import { getRoleFromEmail } from '@/utils/menuPermissions'
+import { cartService } from '@/services/salesService'
 import OrderDetailsModal from './SaleDetailsModal'
 import TableFilters from './TableFilters'
 import type { Order } from '@/types/api/sales'
@@ -88,13 +90,16 @@ const OrdersListTable = () => {
   const [typeFilter, setTypeFilter] = useState(isCashier ? 'online' : 'all')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
+  const [paymentTypeFilter, setPaymentTypeFilter] = useState('all')
+  const [isExporting, setIsExporting] = useState(false)
 
   const { data, isLoading, isError } = useOrders({
     page: page + 1,
     limit,
     type: typeFilter === 'all' ? undefined : (typeFilter as 'in_store' | 'online'),
     startDate: startDate || undefined,
-    endDate: endDate || undefined
+    endDate: endDate || undefined,
+    paymentType: paymentTypeFilter === 'all' ? undefined : (paymentTypeFilter as 'cash' | 'card' | 'qr')
   })
 
   const handleRowClick = (order: Order) => {
@@ -114,6 +119,35 @@ const OrdersListTable = () => {
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
     setLimit(parseInt(event.target.value, 10))
     setPage(0)
+  }
+
+  const handleExportToExcel = async () => {
+    try {
+      setIsExporting(true)
+
+      const blob = await cartService.exportToExcel({
+        type: typeFilter === 'all' ? undefined : (typeFilter as 'in_store' | 'online'),
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+        paymentType: paymentTypeFilter === 'all' ? undefined : (paymentTypeFilter as 'cash' | 'card' | 'qr')
+      })
+
+      // Crear un URL para el blob y descargar el archivo
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+
+      link.href = url
+      link.download = `ventas_${new Date().toISOString().split('T')[0]}.xlsx`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Error al exportar a Excel:', error)
+      alert('Error al generar el reporte de Excel')
+    } finally {
+      setIsExporting(false)
+    }
   }
 
   if (isLoading) {
@@ -138,7 +172,17 @@ const OrdersListTable = () => {
   return (
     <>
       <Card>
-        <CardHeader title='Lista de Ventas' className='pbe-4' />
+        <CardHeader
+          title='Filtros y Acciones'
+          className='pbe-4'
+          action={
+            !isCashier && (
+              <Button variant='contained' color='primary' onClick={handleExportToExcel} disabled={isExporting}>
+                {isExporting ? 'Generando...' : 'Generar Reporte Excel '}
+              </Button>
+            )
+          }
+        />
 
         <TableFilters
           typeFilter={typeFilter}
@@ -147,6 +191,8 @@ const OrdersListTable = () => {
           setStartDate={setStartDate}
           endDate={endDate}
           setEndDate={setEndDate}
+          paymentTypeFilter={paymentTypeFilter}
+          setPaymentTypeFilter={setPaymentTypeFilter}
         />
 
         <div className='overflow-x-auto'>
