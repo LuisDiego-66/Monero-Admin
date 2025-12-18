@@ -114,6 +114,7 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
   const [dhlCode, setDhlCode] = useState('')
   const [showDhlInput, setShowDhlInput] = useState(false)
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
+  const [showEditConfirm, setShowEditConfirm] = useState(false)
   const [snackPack, setSnackPack] = useState<SnackbarMessage[]>([])
   const [messageInfo, setMessageInfo] = useState<SnackbarMessage | undefined>(undefined)
   const [snackbarOpen, setSnackbarOpen] = useState(false)
@@ -173,7 +174,13 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
     }
   }
 
-  const handleEditOrder = async () => {
+  const handleEditOrder = () => {
+    setShowEditConfirm(true)
+  }
+
+  const handleEditOrderConfirm = async () => {
+    setShowEditConfirm(false)
+
     if (order.status === 'cancelled_for_edit') {
       showMessage('Cargando orden para editar...', 'info')
       setTimeout(() => {
@@ -832,6 +839,46 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
             fullWidth
           >
             {cancelOrderMutation.isPending ? 'Cancelando...' : 'Sí, Cancelar'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal de confirmación de edición */}
+      <Dialog open={showEditConfirm} onClose={() => setShowEditConfirm(false)} maxWidth='xs' fullWidth>
+        <DialogTitle>
+          <Typography fontWeight='bold'>
+            {order.status === 'cancelled_for_edit' ? '¿Continuar Editando?' : '¿Editar Orden?'}
+          </Typography>
+        </DialogTitle>
+        <DialogContent>
+          <Typography>
+            {order.status === 'cancelled_for_edit'
+              ? `¿Deseas continuar editando la orden #{order.id}?`
+              : `¿Estás seguro que deseas editar la orden #{order.id}? Podrás modificar los productos y cantidades.`}
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
+          <Button
+            onClick={() => setShowEditConfirm(false)}
+            disabled={cancelForEditMutation.isPending}
+            variant='outlined'
+            fullWidth
+          >
+            No, Cancelar
+          </Button>
+          <Button
+            onClick={handleEditOrderConfirm}
+            color='warning'
+            variant='contained'
+            disabled={cancelForEditMutation.isPending}
+            startIcon={cancelForEditMutation.isPending ? <CircularProgress size={20} color='inherit' /> : null}
+            fullWidth
+          >
+            {cancelForEditMutation.isPending
+              ? 'Preparando...'
+              : order.status === 'cancelled_for_edit'
+                ? 'Sí, Continuar'
+                : 'Sí, Editar'}
           </Button>
         </DialogActions>
       </Dialog>
