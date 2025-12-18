@@ -853,8 +853,8 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
         <DialogContent>
           <Typography>
             {order.status === 'cancelled_for_edit'
-              ? `¿Deseas continuar editando la orden #{order.id}?`
-              : `¿Estás seguro que deseas editar la orden #{order.id}? Podrás modificar los productos y cantidades.`}
+              ? `¿Deseas continuar editando la orden ?`
+              : `¿Estás seguro que deseas editar la orden ? Podrás modificar los productos y cantidades.`}
           </Typography>
         </DialogContent>
         <DialogActions sx={{ p: 2, gap: 1 }}>
