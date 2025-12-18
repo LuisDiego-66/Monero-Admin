@@ -40,6 +40,8 @@ interface PaymentDialogProps {
   onPaymentSelect: (paymentType: 'cash' | 'card' | 'qr') => void
   onConfirmPayment: () => void
   onCancelOrder: () => void
+  isEditingOrder?: boolean
+  editingOrderId?: number | null
 }
 
 const PaymentDialog: React.FC<PaymentDialogProps> = ({
@@ -56,7 +58,9 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   onClose,
   onPaymentSelect,
   onConfirmPayment,
-  onCancelOrder
+  onCancelOrder,
+  isEditingOrder = false,
+  editingOrderId = null
 }) => {
   const formatCurrency = (amount: number | string) => {
     const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount
@@ -85,8 +89,12 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     >
       <DialogTitle>
         <Typography variant='h5' fontWeight='bold'>
-          {orderData ? `Método de Pago - Orden #${orderData.id}` : 'Seleccione Método de Pago'}
-          {timeRemaining > 0 && orderData && (
+          {isEditingOrder
+            ? `Confirmar Edición - Orden #${editingOrderId}`
+            : orderData
+              ? `Método de Pago - Orden #${orderData.id}`
+              : 'Seleccione Método de Pago'}
+          {timeRemaining > 0 && orderData && !isEditingOrder && (
             <Paper sx={{ p: 2, mb: 3, bgcolor: 'warning.lighter', border: 1, borderColor: 'warning.main' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
                 <Typography variant='body1' fontWeight='bold' color='warning.dark'>
@@ -112,9 +120,11 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
         </Typography>
       </DialogTitle>
       <DialogContent>
-        <Paper sx={{ p: 3, mb: 3, textAlign: 'center', bgcolor: 'primary.lighter' }}>
-          <Typography variant='h4' color='primary' fontWeight='bold'>
-            Total a pagar:{' '}
+        <Paper
+          sx={{ p: 3, mb: 3, textAlign: 'center', bgcolor: isEditingOrder ? 'warning.lighter' : 'primary.lighter' }}
+        >
+          <Typography variant='h4' color={isEditingOrder ? 'warning' : 'primary'} fontWeight='bold'>
+            {isEditingOrder ? 'Nuevo Total: ' : 'Total a pagar: '}
             {orderData
               ? formatCurrency(orderData.totalPrice)
               : repriceData
@@ -123,8 +133,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
           </Typography>
         </Paper>
 
-        {/* Mostrar métodos de pago solo si NO se ha creado la orden todavía */}
-        {!orderData && (
+        {!orderData && !isEditingOrder && (
           <Grid container spacing={2}>
             {paymentMethods.map(method => (
               <Grid size={{ xs: 6 }} key={method.id}>
@@ -233,7 +242,24 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
         )}
       </DialogContent>
       <DialogActions sx={{ p: 3, gap: 2 }}>
-        {!orderData ? (
+        {isEditingOrder ? (
+          <>
+            {/* Modo edición*/}
+            <Button onClick={onClose} variant='outlined' fullWidth disabled={isLoading}>
+              Cancelar
+            </Button>
+            <Button
+              variant='contained'
+              color='warning'
+              onClick={onConfirmPayment}
+              disabled={isLoading}
+              startIcon={isLoading ? <CircularProgress size={20} color='inherit' /> : <span>✓</span>}
+              fullWidth
+            >
+              {isLoading ? 'Actualizando...' : 'Confirmar Cambios'}
+            </Button>
+          </>
+        ) : !orderData ? (
           <Button onClick={onClose} variant='outlined' fullWidth>
             Cerrar
           </Button>

@@ -33,6 +33,8 @@ const getEstadoColor = (estado: string): 'primary' | 'error' | 'success' | 'warn
       return 'primary'
     case 'expired':
       return 'error'
+    case 'cancelled_for_edit':
+      return 'warning'
     default:
       return 'primary'
   }
@@ -46,7 +48,8 @@ const getEstadoLabel = (estado: string): string => {
     completed: 'Completado',
     confirmed: 'Confirmado',
     sent: 'Enviado',
-    expired: 'Expirado'
+    expired: 'Expirado',
+    cancelled_for_edit: 'En Edición'
   }
 
   return labels[estado] || estado

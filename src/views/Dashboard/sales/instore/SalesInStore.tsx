@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react'
 
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 import { Grid, Box, Alert } from '@mui/material'
 
@@ -13,7 +13,9 @@ import {
   useConfirmOrder,
   useCancelOrder,
   useGenerateQR,
-  useVerifyPayment
+  useVerifyPayment,
+  useGetOrder,
+  useUpdateOrder
 } from '@/hooks/useSales'
 import { useVariants } from '@/hooks/useVariants'
 import type { CartItem, RepriceResponse, Order, GenerateQRResponse } from '@/types/api/sales'
@@ -47,6 +49,7 @@ const steps = ['Armando Carrito', 'Verificando Stock', 'Orden Creada', 'Procesan
 
 const PointOfSale: React.FC = () => {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [cartItems, setCartItems] = useState<CartItemLocal[]>([])
@@ -69,6 +72,10 @@ const PointOfSale: React.FC = () => {
   const [qrData, setQrData] = useState<GenerateQRResponse | null>(null)
   const [isVerifyingPayment, setIsVerifyingPayment] = useState(false)
 
+  // Estados para el modo de edición
+  const [isEditingOrder, setIsEditingOrder] = useState(false)
+  const [editingOrderId, setEditingOrderId] = useState<number | null>(null)
+
   const debounceTimerRef = useRef<NodeJS.Timeout>()
   const timerIntervalRef = useRef<NodeJS.Timeout>()
   const skipDebounceRef = useRef(false)
@@ -78,13 +85,56 @@ const PointOfSale: React.FC = () => {
   const createOrderMutation = useCreateOrder()
   const confirmOrderMutation = useConfirmOrder()
   const cancelOrderMutation = useCancelOrder()
+  const updateOrderMutation = useUpdateOrder()
 
   const generateQRMutation = useGenerateQR()
 
   // Query para verificar el pago QR usando el Order ID
   const { data: paymentVerification } = useVerifyPayment(orderData?.id ? String(orderData.id) : '', isVerifyingPayment)
 
+  // Query para cargar la orden en edición
+  const { data: editingOrderData, isLoading: isLoadingEditingOrder } = useGetOrder(editingOrderId, !!editingOrderId)
+
   const { data: variantsData, isLoading: isLoadingVariants } = useVariants(variantsPage, variantsLimit, debouncedSearch)
+
+  // Detectar si estamos en modo edición al cargar el componente
+  useEffect(() => {
+    const editOrderIdParam = searchParams.get('editOrderId')
+
+    if (editOrderIdParam) {
+      const orderId = parseInt(editOrderIdParam, 10)
+
+      if (!isNaN(orderId)) {
+        setEditingOrderId(orderId)
+        setIsEditingOrder(true)
+      }
+    }
+  }, [searchParams])
+
+  // Cargar la orden en el carrito cuando se obtienen los datos
+  useEffect(() => {
+    if (editingOrderData && isEditingOrder && editingOrderData.items) {
+      const loadedCartItems: CartItemLocal[] = editingOrderData.items
+        .filter(item => item.variant && item.variant.id) // Filtrar items sin variant
+        .map(item => ({
+          variantId: item.variant.id,
+          quantity: item.quantity,
+          variantInfo: {
+            variantSizeId: item.variant.id,
+            displayName: item.variant.productColor?.product?.name || 'Producto',
+            color: item.variant.productColor?.color,
+            size: typeof item.variant.size === 'string' ? item.variant.size : item.variant.size?.name,
+            stock: 999,
+            multimedia: item.variant.productColor?.multimedia || [],
+            product: item.variant.productColor?.product,
+            price: parseFloat(item.unit_price)
+          }
+        }))
+
+      setCartItems(loadedCartItems)
+      setErrorMessage('')
+    }
+  }, [editingOrderData, isEditingOrder])
 
   useEffect(() => {
     if (debounceTimerRef.current) {
@@ -294,12 +344,24 @@ const PointOfSale: React.FC = () => {
       const cartResponse = await addToCartMutation.mutateAsync(payload)
 
       setCartToken(cartResponse.token)
-      const repriceResponse = await repriceMutation.mutateAsync(cartResponse.token)
 
-      setRepriceData(repriceResponse)
-      setCurrentStep('ORDER_CREATED')
-      setActiveStepIndex(2)
-      setShowPaymentDialog(true)
+      if (isEditingOrder) {
+        // Modo edición: Solo verificar stock, no crear orden nueva
+        const repriceResponse = await repriceMutation.mutateAsync(cartResponse.token)
+
+        setRepriceData(repriceResponse)
+        setCurrentStep('ORDER_CREATED')
+        setActiveStepIndex(2)
+        setShowPaymentDialog(true)
+      } else {
+        // Modo normal: Verificar stock y precios
+        const repriceResponse = await repriceMutation.mutateAsync(cartResponse.token)
+
+        setRepriceData(repriceResponse)
+        setCurrentStep('ORDER_CREATED')
+        setActiveStepIndex(2)
+        setShowPaymentDialog(true)
+      }
     } catch (error: any) {
       const errorMsg = error?.response?.data?.message || 'Error al verificar disponibilidad de productos'
 
@@ -406,6 +468,12 @@ const PointOfSale: React.FC = () => {
   }
 
   const confirmPayment = async () => {
+    // Si estamos en modo edición, confirmar la edición
+    if (isEditingOrder && editingOrderId) {
+      return confirmEditOrder()
+    }
+
+    // Modo normal: confirmar pago
     if (!orderData) {
       setErrorMessage('No hay orden creada')
 
@@ -431,6 +499,37 @@ const PointOfSale: React.FC = () => {
       }
     } catch (error: any) {
       setErrorMessage(error?.response?.data?.message || 'Error al procesar el pago')
+      setCurrentStep('ORDER_CREATED')
+      setActiveStepIndex(2)
+    }
+  }
+
+  const confirmEditOrder = async () => {
+    if (!cartToken || !editingOrderId) {
+      setErrorMessage('No hay carrito o ID de orden disponible')
+
+      return
+    }
+
+    try {
+      setErrorMessage('')
+      setCurrentStep('PAYMENT')
+      setActiveStepIndex(3)
+
+      await updateOrderMutation.mutateAsync({
+        orderId: editingOrderId,
+        items: cartToken
+      })
+
+      setCurrentStep('COMPLETED')
+      setShowPaymentDialog(false)
+      setShowSuccessDialog(true)
+
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current)
+      }
+    } catch (error: any) {
+      setErrorMessage(error?.response?.data?.message || 'Error al actualizar la orden')
       setCurrentStep('ORDER_CREATED')
       setActiveStepIndex(2)
     }
@@ -566,11 +665,13 @@ const PointOfSale: React.FC = () => {
               orderData={orderData}
               repriceData={repriceData}
               currentStep={currentStep}
-              isLoading={isLoading}
+              isLoading={isLoading || isLoadingEditingOrder}
               onClearCart={clearCart}
               onRemoveItem={removeFromCart}
               onUpdateQuantity={updateQuantity}
               onProceedToPayment={verifyStockAndPrices}
+              isEditingOrder={isEditingOrder}
+              editingOrderId={editingOrderId}
             />
           </Grid>
         </Grid>
@@ -592,6 +693,8 @@ const PointOfSale: React.FC = () => {
         onPaymentSelect={handlePaymentMethodSelect}
         onConfirmPayment={confirmPayment}
         onCancelOrder={() => setShowCancelDialog(true)}
+        isEditingOrder={isEditingOrder}
+        editingOrderId={editingOrderId}
       />
 
       <CancelDialog
@@ -607,9 +710,17 @@ const PointOfSale: React.FC = () => {
         orderData={orderData}
         onAccept={() => {
           setShowSuccessDialog(false)
-          clearCart()
+
+          if (isEditingOrder) {
+            // Si estamos en modo edición, redirige a la lista de ventas
+            router.push('/sales/list')
+          } else {
+            clearCart()
+          }
         }}
         onViewSales={() => router.push('/sales/list')}
+        isEditingOrder={isEditingOrder}
+        editingOrderId={editingOrderId}
       />
     </Box>
   )

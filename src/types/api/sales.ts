@@ -50,7 +50,7 @@ export interface OrderItem {
 export interface Order {
   id: number
   type: 'in_store' | 'online'
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'paid' | 'sent' | 'expired'
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'paid' | 'sent' | 'expired' | 'cancelled_for_edit'
   payment_type: 'cash' | 'card' | 'qr'
   enabled: boolean
   totalPrice: string

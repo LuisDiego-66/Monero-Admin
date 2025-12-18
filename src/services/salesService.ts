@@ -96,6 +96,27 @@ class CartServiceClass {
 
     return response.data
   }
+
+  // Cancelar orden para editar
+  async cancelOrderForEdit(orderId: number): Promise<Order> {
+    const response = await apiClient.post<Order>(`/api/orders/cancel-for-edit/${orderId}`)
+
+    return response.data
+  }
+
+  // Obtener una orden específica
+  async getOrder(orderId: number): Promise<Order> {
+    const response = await apiClient.get<Order>(`/api/orders/${orderId}`)
+
+    return response.data
+  }
+
+  // Actualizar orden (editar items)
+  async updateOrder(orderId: number, items: string): Promise<Order> {
+    const response = await apiClient.patch<Order>(`/api/orders/${orderId}`, { items })
+
+    return response.data
+  }
 }
 
 export const cartService = new CartServiceClass()

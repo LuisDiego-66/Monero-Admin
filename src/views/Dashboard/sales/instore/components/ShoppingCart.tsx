@@ -28,6 +28,8 @@ interface ShoppingCartProps {
   onRemoveItem: (variantId: number) => void
   onUpdateQuantity: (variantId: number, quantity: number) => void
   onProceedToPayment: () => void
+  isEditingOrder?: boolean
+  editingOrderId?: number | null
 }
 
 const ShoppingCart: React.FC<ShoppingCartProps> = ({
@@ -39,7 +41,9 @@ const ShoppingCart: React.FC<ShoppingCartProps> = ({
   onClearCart,
   onRemoveItem,
   onUpdateQuantity,
-  onProceedToPayment
+  onProceedToPayment,
+  isEditingOrder = false,
+  editingOrderId = null
 }) => {
   const formatCurrency = (amount: number | string) => {
     const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount
@@ -69,10 +73,15 @@ const ShoppingCart: React.FC<ShoppingCartProps> = ({
       <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box>
-            <Typography variant='h6' color='primary' fontWeight='bold'>
-              CARRITO
+            <Typography variant='h6' color={isEditingOrder ? 'warning' : 'primary'} fontWeight='bold'>
+              {isEditingOrder ? 'EDITANDO ORDEN' : 'CARRITO'}
             </Typography>
-            {orderData && (
+            {isEditingOrder && editingOrderId && (
+              <Typography variant='caption' color='warning.main' fontWeight='medium'>
+                Orden #{editingOrderId}
+              </Typography>
+            )}
+            {orderData && !isEditingOrder && (
               <Typography variant='caption' color='text.secondary'>
                 Orden #{orderData.id}
               </Typography>
@@ -207,15 +216,17 @@ const ShoppingCart: React.FC<ShoppingCartProps> = ({
               disabled={cartItems.length === 0 || isLoading}
               startIcon={isLoading ? <CircularProgress size={18} color='inherit' /> : <span>✓</span>}
               sx={{ py: 1 }}
+              color={isEditingOrder ? 'warning' : 'primary'}
             >
-              {isLoading ? 'Procesando...' : 'Proceder al pago'}
+              {isLoading ? 'Procesando...' : isEditingOrder ? 'Confirmar Cambios' : 'Proceder al pago'}
             </Button>
           ) : (
             <Alert severity='info' sx={{ py: 0.5 }}>
               <Typography variant='caption'>
                 {currentStep === 'VERIFYING_STOCK' && 'Verificando disponibilidad...'}
-                {currentStep === 'ORDER_CREATED' && 'Orden creada, seleccione método de pago'}
-                {currentStep === 'PAYMENT' && 'Procesando pago...'}
+                {currentStep === 'ORDER_CREATED' &&
+                  (isEditingOrder ? 'Listo para confirmar cambios' : 'Orden creada, seleccione método de pago')}
+                {currentStep === 'PAYMENT' && (isEditingOrder ? 'Actualizando orden...' : 'Procesando pago...')}
               </Typography>
             </Alert>
           )}

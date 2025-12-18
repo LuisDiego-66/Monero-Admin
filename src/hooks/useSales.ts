@@ -101,3 +101,36 @@ export const useVerifyPayment = (paymentId: string, enabled: boolean = false) =>
     retry: false
   })
 }
+
+// Hook para cancelar orden y preparar para edición
+export const useCancelOrderForEdit = () => {
+  return useMutation({
+    mutationFn: (orderId: number) => cartService.cancelOrderForEdit(orderId),
+    onError: (error: any) => {
+      console.error('Error cancelling order for edit:', error)
+      throw error
+    }
+  })
+}
+
+// Hook para obtener una orden específica
+export const useGetOrder = (orderId: number | null, enabled: boolean = true) => {
+  return useQuery({
+    queryKey: ['order', orderId],
+    queryFn: () => cartService.getOrder(orderId!),
+    enabled: enabled && !!orderId,
+    retry: false
+  })
+}
+
+// Hook para actualizar orden (editar items)
+export const useUpdateOrder = () => {
+  return useMutation({
+    mutationFn: ({ orderId, items }: { orderId: number; items: string }) =>
+      cartService.updateOrder(orderId, items),
+    onError: (error: any) => {
+      console.error('Error updating order:', error)
+      throw error
+    }
+  })
+}
