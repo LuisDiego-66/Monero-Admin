@@ -23,7 +23,7 @@ export const metadata = {
   description: 'Administrador - Monero'
 }
 
-const RootLayout = async (props: ChildrenType & { params: Promise<{ lang: Locale }> }) => {
+const RootLayout = async (props: ChildrenType & { params?: Promise<{ lang?: Locale }> }) => {
   const { children } = props
 
   // Vars

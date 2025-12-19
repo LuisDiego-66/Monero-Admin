@@ -237,7 +237,7 @@ const OrderDetailsModal = ({ open, onClose, order }: OrderDetailsModalProps) => 
   return (
     <Dialog open={open} onClose={onClose} maxWidth='lg' fullWidth scroll='paper'>
       <DialogTitle className='flex justify-between items-center pb-4'>
-        <Typography variant='h4' className='font-semibold'>
+        <Typography variant='h4' component='span' className='font-semibold'>
           Detalles de la Orden #{order.id}
         </Typography>
         <IconButton onClick={onClose} size='small'>
